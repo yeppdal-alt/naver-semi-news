@@ -1,6 +1,6 @@
 """
 멀티 섹션 뉴스 감성 분석 대시보드 (Streamlit Cloud 배포용)
-반도체 / 금리 / 이란 전쟁 세 섹션을 동일한 신문형 포맷으로 보여준다.
+반도체 / 금리 / 이란 전쟁 세 섹션을 동일한 포맷으로 보여준다.
 
 - 데이터 소스: 네이버 뉴스 검색 API
   API 가이드: https://guide.ncloud-docs.com/docs/home 참고
@@ -27,11 +27,13 @@ FETCH_DISPLAY = 30  # 키워드당 조회 건수 (제목 필터링 후에도 top
 DESC_TRUNCATE_RATIO = 0.5  # 기사 요약 길이 축소 비율
 DESC_MIN_LEN = 35  # 축소 시 최소 보장 길이
 
-# 신문 편집 톤앤매너 (딥그린 + 세리프 + 오프화이트)
-GREEN = "#1b4332"
-NEG_RED = "#7a2a1f"
-NEUTRAL_GRAY = "#5c5c58"
-SENTIMENT_COLORS = {"긍정": GREEN, "부정": NEG_RED, "중립": NEUTRAL_GRAY}
+# 모던 SaaS 톤앤매너 (인디고 · 화이트 카드 · 라이트 라벤더 배경)
+INDIGO = "#4f46e5"
+POS_COLOR = "#0e9f6e"
+NEG_COLOR = "#e02424"
+NEU_COLOR = "#6b7280"
+SENTIMENT_COLORS = {"긍정": POS_COLOR, "부정": NEG_COLOR, "중립": NEU_COLOR}
+SENTIMENT_BG = {"긍정": "#e7f7f0", "부정": "#fdeced", "중립": "#f1f2f6"}
 
 # ----------------------------------------------------------------------------
 # 섹션(토픽) 정의 — 각 섹션은 같은 포맷으로 렌더링됨
@@ -69,8 +71,9 @@ IRAN_NEG = [
 TOPICS = [
     {
         "id": "semiconductor",
-        "kicker": "Semiconductor Sector · Live Sentiment Wire",
-        "title": "반도체 뉴스 감성 대시보드",
+        "badge": "산업",
+        "title": "반도체",
+        "subtitle": "메모리 · 파운드리 · HBM 관련 최신 보도",
         "keywords": SEMI_KEYWORDS,
         "pos_words": SEMI_POS,
         "neg_words": SEMI_NEG,
@@ -78,8 +81,9 @@ TOPICS = [
     },
     {
         "id": "rates",
-        "kicker": "Interest Rates · Live Sentiment Wire",
-        "title": "금리 뉴스 감성 섹션",
+        "badge": "거시경제",
+        "title": "금리",
+        "subtitle": "기준금리 · 연준 · 국고채 동향",
         "keywords": RATE_KEYWORDS,
         "pos_words": RATE_POS,
         "neg_words": RATE_NEG,
@@ -87,8 +91,9 @@ TOPICS = [
     },
     {
         "id": "iran_war",
-        "kicker": "Iran Conflict · Live Sentiment Wire",
-        "title": "이란 전쟁 뉴스 감성 섹션",
+        "badge": "국제정세",
+        "title": "이란 전쟁",
+        "subtitle": "중동 분쟁 · 호르무즈 해협 리스크",
         "keywords": IRAN_KEYWORDS,
         "pos_words": IRAN_POS,
         "neg_words": IRAN_NEG,
@@ -96,60 +101,83 @@ TOPICS = [
     },
 ]
 
-st.set_page_config(page_title="뉴스 감성 대시보드", layout="wide")
+st.set_page_config(page_title="뉴스 브리핑 대시보드", layout="wide")
 
-NEWSPAPER_CSS = """
+APP_CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700&display=swap');
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
 
-.stApp { background-color: #faf9f5; }
-.block-container { padding-top: 3.5rem !important; max-width: 1200px; }
+.stApp { background-color: #f7f8fc; }
+.block-container {
+    padding-top: 3.2rem !important;
+    padding-bottom: 3rem;
+    max-width: 1280px;
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.block-container * { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 
-.np-kicker {
-    font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
-    color: #5c5c58; margin: 0.4rem 0 6px 0; line-height: 1.6;
+/* 페이지 헤더 */
+.hd-wrap { margin-bottom: 26px; }
+.hd-eyebrow {
+    display: inline-block; background: #eef2ff; color: #4f46e5;
+    font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 999px;
+    margin-bottom: 12px;
 }
-.np-title {
-    font-family: 'Noto Serif KR', Georgia, serif;
-    font-size: 38px; font-weight: 700; margin: 0 0 12px 0; color: #1a1a1a;
-    line-height: 1.3;
-}
-.np-rule { border-top: 3px solid #1a1a1a; border-bottom: 1px solid #1a1a1a; height: 4px; margin-bottom: 22px; }
-.np-section-label {
-    display: inline-block; background: #1b4332; color: #fff;
-    font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
-    padding: 4px 12px; margin: 10px 0 14px 0;
-}
-.np-heading {
-    font-family: 'Noto Serif KR', Georgia, serif; font-size: 22px; font-weight: 700;
-    margin: 6px 0 4px 0; padding-bottom: 6px; border-bottom: 3px solid #1a1a1a;
-}
-.np-quote {
-    font-family: 'Noto Serif KR', Georgia, serif; font-style: italic; font-size: 17px;
-    line-height: 1.6; border-left: 4px solid #1b4332; background: #ffffff;
-    padding: 14px 20px; margin: 4px 0 10px 0;
-}
-.np-divider { border-top: 6px double #1a1a1a; margin: 44px 0 30px 0; }
-[data-testid="stMetric"] {
-    background: #ffffff; border-top: 2px solid #1a1a1a; border-radius: 0;
-    padding: 10px 4px 6px 12px;
-}
-[data-testid="stMetricLabel"] p { text-transform: uppercase; letter-spacing: .06em; font-size: 11px !important; color: #5c5c58 !important; }
-[data-testid="stMetricValue"] { font-family: 'Noto Serif KR', Georgia, serif; }
+.hd-title { font-size: 30px; font-weight: 700; color: #101322; margin: 0 0 6px 0; letter-spacing: -0.02em; }
+.hd-sub { font-size: 14px; color: #6b7280; margin: 0; }
 
-.np-col-header {
-    display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .1em;
-    text-transform: uppercase; color: #fff; padding: 4px 12px; margin-bottom: 14px;
+/* 섹션 헤더 */
+.sec-head {
+    display: flex; align-items: center; gap: 10px;
+    margin: 0 0 14px 0; padding-bottom: 12px; border-bottom: 1px solid #e8eaf1;
 }
-.np-article { border-bottom: 1px solid #d8d6cd; padding: 13px 0; }
-.np-article-title {
-    font-family: 'Noto Serif KR', Georgia, serif; font-size: 16px; font-weight: 700;
-    color: #1a1a1a; text-decoration: none; line-height: 1.35; display: block;
+.sec-badge {
+    background: #eef2ff; color: #4f46e5; font-size: 11px; font-weight: 600;
+    padding: 4px 10px; border-radius: 6px;
 }
-.np-article-title:hover { color: #1b4332; text-decoration: underline; }
-.np-meta { font-size: 11px; letter-spacing: .03em; text-transform: uppercase; color: #5c5c58; margin: 6px 0 8px 0; }
-.np-desc { font-family: 'Noto Serif KR', Georgia, serif; font-size: 14px; color: #3a3a37; line-height: 1.55; margin-bottom: 4px; }
-.np-reason { font-size: 12px; color: #5c5c58; font-style: italic; }
+.sec-title { font-size: 20px; font-weight: 700; color: #101322; letter-spacing: -0.01em; }
+.sec-sub { font-size: 13px; color: #9096a5; margin-left: 2px; }
+
+/* 요약 지표 (한 줄 pill) */
+.kpi-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.kpi {
+    display: flex; align-items: baseline; gap: 7px;
+    background: #ffffff; border: 1px solid #e8eaf1; border-radius: 10px;
+    padding: 8px 14px;
+}
+.kpi-label { font-size: 12px; color: #6b7280; font-weight: 500; }
+.kpi-value { font-size: 17px; font-weight: 700; color: #101322; }
+.kpi-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+
+.tone-bar {
+    background: #ffffff; border: 1px solid #e8eaf1; border-left: 3px solid #4f46e5;
+    border-radius: 8px; padding: 10px 14px; font-size: 13.5px; color: #3b4051;
+    margin-bottom: 14px;
+}
+
+/* 기사 카드 열 */
+.col-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 12px; border-radius: 8px; margin-bottom: 8px;
+}
+.col-head-name { font-size: 12.5px; font-weight: 700; }
+.col-head-count { font-size: 11.5px; font-weight: 600; opacity: .75; }
+
+.card-list { background: #ffffff; border: 1px solid #e8eaf1; border-radius: 12px; padding: 2px 14px; }
+.news-item { padding: 11px 0; border-bottom: 1px solid #f0f1f5; }
+.news-item:last-child { border-bottom: none; }
+.news-title {
+    font-size: 13.5px; font-weight: 600; color: #101322; text-decoration: none;
+    line-height: 1.42; display: block;
+}
+.news-title:hover { color: #4f46e5; }
+.news-meta { font-size: 11px; color: #9096a5; margin: 5px 0 4px 0; }
+.news-desc {
+    font-size: 12px; color: #6b7280; line-height: 1.5; margin: 0;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.empty-note { font-size: 12.5px; color: #9096a5; padding: 14px 2px; }
+.sec-gap { height: 34px; }
 </style>
 """
 
@@ -287,27 +315,105 @@ def collect_all_news(keywords: tuple, pos_words: tuple, neg_words: tuple, max_ag
 # UI
 # ----------------------------------------------------------------------------
 
-def section_label(text: str):
-    st.markdown(f'<div class="np-section-label">{html.escape(text)}</div>', unsafe_allow_html=True)
-
-
-def render_masthead(kicker: str, title: str):
+def render_section_head(topic: dict):
     st.markdown(
-        f'<div class="np-kicker">{html.escape(kicker)}</div>'
-        f'<div class="np-title">{html.escape(title)}</div>'
-        '<div class="np-rule"></div>',
+        '<div class="sec-head">'
+        f'<span class="sec-badge">{html.escape(topic["badge"])}</span>'
+        f'<span class="sec-title">{html.escape(topic["title"])}</span>'
+        f'<span class="sec-sub">{html.escape(topic["subtitle"])}</span>'
+        '</div>',
         unsafe_allow_html=True,
     )
 
 
+def render_kpis(counts: dict, total: int):
+    pills = [
+        ("전체 기사", total, "#4f46e5"),
+        ("긍정", counts["긍정"], POS_COLOR),
+        ("부정", counts["부정"], NEG_COLOR),
+        ("중립", counts["중립"], NEU_COLOR),
+    ]
+    items = "".join(
+        '<div class="kpi">'
+        f'<span class="kpi-dot" style="background:{color}"></span>'
+        f'<span class="kpi-label">{html.escape(label)}</span>'
+        f'<span class="kpi-value">{value}</span>'
+        '</div>'
+        for label, value, color in pills
+    )
+    st.markdown(f'<div class="kpi-row">{items}</div>', unsafe_allow_html=True)
+
+
+def render_ratio_bar(counts: dict, chart_key: str):
+    labels = ["긍정", "부정", "중립"]
+    total = max(sum(counts[l] for l in labels), 1)
+    fig = go.Figure()
+    for l in labels:
+        pct = counts[l] / total * 100
+        fig.add_trace(
+            go.Bar(
+                y=["s"],
+                x=[counts[l]],
+                orientation="h",
+                name=l,
+                marker=dict(color=SENTIMENT_COLORS[l], line=dict(width=0)),
+                text=f"{l} {pct:.0f}%" if pct >= 8 else "",
+                textposition="inside",
+                insidetextanchor="middle",
+                textfont=dict(color="#ffffff", size=11.5),
+                hovertemplate=f"{l}: %{{x}}건<extra></extra>",
+            )
+        )
+    fig.update_layout(
+        barmode="stack",
+        height=44,
+        margin=dict(l=0, r=0, t=0, b=0),
+        showlegend=False,
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
+        bargap=0,
+    )
+    st.plotly_chart(fig, use_container_width=True, key=chart_key, config={"displayModeBar": False})
+
+
+def render_news_column(container, sentiment: str, items: list):
+    color = SENTIMENT_COLORS[sentiment]
+    bg = SENTIMENT_BG[sentiment]
+    container.markdown(
+        f'<div class="col-head" style="background:{bg}">'
+        f'<span class="col-head-name" style="color:{color}">{sentiment}</span>'
+        f'<span class="col-head-count" style="color:{color}">{len(items)}건</span>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    if not items:
+        container.markdown('<div class="empty-note">해당 기사가 없습니다.</div>', unsafe_allow_html=True)
+        return
+
+    rows = []
+    for a in items:
+        time_str = a["pub_date"].strftime("%m/%d %H:%M") if a["pub_date"] else a["pub_date_raw"]
+        meta = f"{time_str} · {', '.join(sorted(a['keywords']))}"
+        rows.append(
+            '<div class="news-item">'
+            f'<a class="news-title" href="{html.escape(a["link"] or "", quote=True)}" target="_blank" rel="noopener">{html.escape(a["title"])}</a>'
+            f'<div class="news-meta">{html.escape(meta)}</div>'
+            f'<p class="news-desc">{html.escape(shorten(a["description"]))}</p>'
+            '</div>'
+        )
+    container.markdown(f'<div class="card-list">{"".join(rows)}</div>', unsafe_allow_html=True)
+
+
 def render_topic(topic: dict, active_keywords: list, chart_key: str):
-    render_masthead(topic["kicker"], topic["title"])
+    render_section_head(topic)
 
     if not active_keywords:
         st.info("키워드를 하나 이상 선택해주세요.")
         return
 
-    with st.spinner(f"{topic['title']} 검색 중..."):
+    with st.spinner(f"{topic['title']} 뉴스 불러오는 중..."):
         articles = collect_all_news(
             tuple(active_keywords), tuple(topic["pos_words"]), tuple(topic["neg_words"])
         )
@@ -320,117 +426,61 @@ def render_topic(topic: dict, active_keywords: list, chart_key: str):
     for a in articles:
         counts[a["sentiment"]] += 1
 
-    section_label("Top News")
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("긍정 기사", counts["긍정"])
-    col2.metric("부정 기사", counts["부정"])
-    col3.metric("중립 기사", counts["중립"])
-    col4.metric("전체 수집 건수", len(articles))
+    render_kpis(counts, len(articles))
 
     if counts["긍정"] > counts["부정"]:
-        tone = "긍정 기사가 부정 기사보다 많아 전반적으로 우호적인 뉴스 흐름입니다."
+        tone = "긍정 보도가 우세합니다. 업황·정책에 우호적인 기사 비중이 높습니다."
     elif counts["부정"] > counts["긍정"]:
-        tone = "부정 기사가 우세해 주의가 필요한 뉴스 흐름입니다."
+        tone = "부정 보도가 우세합니다. 리스크 요인을 다룬 기사 비중이 높습니다."
     else:
-        tone = "긍정과 부정 기사가 비슷한 수준으로, 방향성이 뚜렷하지 않습니다."
-    st.markdown(f'<div class="np-quote">{html.escape(tone)}</div>', unsafe_allow_html=True)
+        tone = "긍정과 부정이 비슷합니다. 방향성이 뚜렷하지 않은 국면입니다."
+    st.markdown(f'<div class="tone-bar">{html.escape(tone)}</div>', unsafe_allow_html=True)
 
-    section_label("Sentiment Trend")
-    labels = ["긍정", "부정", "중립"]
-    total = max(sum(counts[l] for l in labels), 1)
-    fig = go.Figure()
-    for l in labels:
-        pct = counts[l] / total * 100
-        fig.add_trace(
-            go.Bar(
-                y=["sentiment"],
-                x=[counts[l]],
-                orientation="h",
-                name=l,
-                marker_color=SENTIMENT_COLORS[l],
-                text=f"{l} {counts[l]} ({pct:.0f}%)" if counts[l] > 0 else "",
-                textposition="inside",
-                insidetextanchor="middle",
-                textfont=dict(color="#ffffff", size=12),
-                hovertemplate=f"{l}: %{{x}}건<extra></extra>",
-            )
-        )
-    fig.update_layout(
-        barmode="stack",
-        height=64,
-        margin=dict(l=0, r=0, t=4, b=4),
-        showlegend=False,
-        plot_bgcolor="#ffffff",
-        paper_bgcolor="#ffffff",
-        font=dict(family="Georgia, 'Noto Serif KR', serif", color="#1a1a1a"),
-        xaxis=dict(visible=False),
-        yaxis=dict(visible=False),
-    )
-    st.plotly_chart(fig, use_container_width=True, key=chart_key)
-
-    st.markdown(f'<h2 class="np-heading">Latest News · Top {TOP_N}</h2>', unsafe_allow_html=True)
+    render_ratio_bar(counts, chart_key)
 
     def top_articles(sentiment):
         return [a for a in articles if a["sentiment"] == sentiment][:TOP_N]
 
-    col_pos, col_neg, col_neu = st.columns(3)
-
-    def render_column(container, sentiment, color):
-        items = top_articles(sentiment)
-        container.markdown(
-            f'<span class="np-col-header" style="background:{color}">{sentiment} ({len(items)})</span>',
-            unsafe_allow_html=True,
-        )
-        if not items:
-            container.write("해당하는 기사가 없습니다.")
-            return
-        cards = []
-        for a in items:
-            time_str = a["pub_date"].strftime("%m/%d %H:%M") if a["pub_date"] else a["pub_date_raw"]
-            meta = f"{time_str} · {', '.join(sorted(a['keywords']))}"
-            cards.append(
-                '<div class="np-article">'
-                f'<a class="np-article-title" href="{html.escape(a["link"] or "", quote=True)}" target="_blank" rel="noopener">{html.escape(a["title"])}</a>'
-                f'<div class="np-meta">{html.escape(meta)}</div>'
-                f'<div class="np-desc">{html.escape(shorten(a["description"]))}</div>'
-                f'<div class="np-reason">{html.escape(a["reason"] or "")}</div>'
-                '</div>'
-            )
-        container.markdown("".join(cards), unsafe_allow_html=True)
-
-    render_column(col_pos, "긍정", SENTIMENT_COLORS["긍정"])
-    render_column(col_neg, "부정", SENTIMENT_COLORS["부정"])
-    render_column(col_neu, "중립", SENTIMENT_COLORS["중립"])
-
-    st.caption(
-        "※ 감성 분류는 키워드 기반 자동 분류입니다. 정교한 분류가 필요하면 "
-        "LLM API(Claude 등)를 연동해 classify() 함수를 교체하세요."
-    )
+    col_pos, col_neg, col_neu = st.columns(3, gap="small")
+    render_news_column(col_pos, "긍정", top_articles("긍정"))
+    render_news_column(col_neg, "부정", top_articles("부정"))
+    render_news_column(col_neu, "중립", top_articles("중립"))
 
 
 def main():
-    st.markdown(NEWSPAPER_CSS, unsafe_allow_html=True)
-    st.caption(
-        "데이터 출처: 네이버 뉴스 검색 API · "
-        "API 가이드: https://guide.ncloud-docs.com/docs/home"
+    st.markdown(APP_CSS, unsafe_allow_html=True)
+
+    now = datetime.now().strftime("%Y년 %m월 %d일 %H:%M")
+    st.markdown(
+        '<div class="hd-wrap">'
+        '<span class="hd-eyebrow">실시간 뉴스 모니터링</span>'
+        '<h1 class="hd-title">주요 이슈 뉴스 브리핑</h1>'
+        f'<p class="hd-sub">반도체 · 금리 · 이란 전쟁 · 최근 3일 기사 · {now} 기준 · 네이버 뉴스 검색 API</p>'
+        '</div>',
+        unsafe_allow_html=True,
     )
 
     with st.sidebar:
-        st.header("필터")
+        st.subheader("검색 설정")
         selected_semi_keywords = st.multiselect(
             "반도체 키워드", options=SEMI_KEYWORDS, default=SEMI_KEYWORDS
         )
-        st.caption("금리 · 이란 전쟁 섹션은 고정 키워드 세트로 조회됩니다.")
-        if st.button("새로고침 (전체 재조회)"):
+        st.caption("금리 · 이란 전쟁 섹션은 고정 키워드로 조회됩니다.")
+        if st.button("최신 기사 다시 불러오기", use_container_width=True):
             fetch_news_for_keyword.clear()
             collect_all_news.clear()
             st.rerun()
+        st.divider()
+        st.caption(
+            "감성 분류는 키워드 규칙 기반입니다. "
+            "정교한 분류가 필요하면 classify() 함수를 LLM 호출로 교체하세요."
+        )
 
     for i, topic in enumerate(TOPICS):
         keywords = selected_semi_keywords if topic["filterable"] else topic["keywords"]
         render_topic(topic, keywords, chart_key=f"chart-{topic['id']}")
         if i < len(TOPICS) - 1:
-            st.markdown('<div class="np-divider"></div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec-gap"></div>', unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
