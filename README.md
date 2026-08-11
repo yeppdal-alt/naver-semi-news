@@ -20,8 +20,10 @@ https://guide.ncloud-docs.com/docs/home
 - `NAVER_CLIENT_SECRET` (콘솔의 Client Secret, 헤더명 `X-NCP-APIGW-API-KEY`)
 
 > NAVER Cloud Platform 콘솔에서 발급한 키는 개발자센터(developers.naver.com)의 예전
-> Open API 키와 인증 방식이 다릅니다. `main.py`는 NCP 콘솔 키 기준
-> (`https://naveropenapi.apigw.ntruss.com`, `X-NCP-APIGW-API-KEY-ID`/`X-NCP-APIGW-API-KEY` 헤더)으로 작성되어 있습니다.
+> Open API 키와 인증 방식이 다릅니다. `main.py`는 NAVER API HUB 뉴스 검색 API 기준
+> (`https://naverapihub.apigw.ntruss.com/search/v1/news`,
+> `X-NCP-APIGW-API-KEY-ID`/`X-NCP-APIGW-API-KEY` 헤더)으로 작성되어 있습니다.
+> API 상세 명세: https://api.ncloud-docs.com/docs/naver-api-hub-search-news
 
 ## 2. 로컬 실행
 
