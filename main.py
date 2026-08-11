@@ -19,7 +19,7 @@ import streamlit as st
 # 설정
 # ----------------------------------------------------------------------------
 
-NAVER_NEWS_URL = "https://openapi.naver.com/v1/search/news.json"
+NAVER_NEWS_URL = "https://naveropenapi.apigw.ntruss.com/v1/search/news.json"
 
 KEYWORDS = ["반도체", "삼성전자 반도체", "SK하이닉스", "HBM", "파운드리", "메모리 반도체"]
 
@@ -82,9 +82,11 @@ def get_naver_headers():
             "발급 방법은 https://guide.ncloud-docs.com/docs/home 를 참고하세요."
         )
         st.stop()
+    # NAVER Cloud Platform 콘솔(VPC)에서 발급받은 애플리케이션은
+    # X-Naver-Client-Id / X-Naver-Client-Secret 이 아니라 아래 두 헤더를 사용합니다.
     return {
-        "X-Naver-Client-Id": client_id,
-        "X-Naver-Client-Secret": client_secret,
+        "X-NCP-APIGW-API-KEY-ID": client_id,
+        "X-NCP-APIGW-API-KEY": client_secret,
     }
 
 
