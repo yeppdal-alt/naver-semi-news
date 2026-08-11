@@ -128,6 +128,7 @@ APP_CSS = """
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
 
 .stApp { background-color: #f7f8fc; }
+section[data-testid="stSidebar"], div[data-testid="stSidebarCollapsedControl"] { display: none !important; }
 .block-container {
     padding-top: 3.2rem !important;
     padding-bottom: 3rem;
@@ -157,6 +158,22 @@ APP_CSS = """
 }
 .sec-title { font-size: 20px; font-weight: 700; color: #101322; letter-spacing: -0.01em; }
 .sec-sub { font-size: 13px; color: #9096a5; margin-left: 2px; }
+
+/* 섹션 내 키워드 컨트롤 */
+.kw-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px 0; }
+.kw-chip {
+    background: #eef2ff; color: #4f46e5; border: 1px solid #dfe4ff;
+    font-size: 11.5px; font-weight: 500; padding: 3px 10px; border-radius: 999px;
+}
+div[data-testid="stMultiSelect"] { margin-bottom: 10px; }
+div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div {
+    background: #ffffff; border: 1px solid #e8eaf1; border-radius: 10px; min-height: 38px;
+}
+div[data-testid="stMultiSelect"] span[data-baseweb="tag"] {
+    background: #eef2ff !important; color: #4f46e5 !important;
+    border-radius: 6px; font-size: 11.5px; font-weight: 500;
+}
+div[data-testid="stMultiSelect"] span[data-baseweb="tag"] svg { fill: #4f46e5; }
 
 /* 요약 지표 (한 줄 pill) */
 .kpi-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
@@ -439,8 +456,24 @@ def render_news_column(container, sentiment: str, items: list):
     container.markdown(f'<div class="card-list">{"".join(rows)}</div>', unsafe_allow_html=True)
 
 
-def render_topic(topic: dict, active_keywords: list, chart_key: str):
+def render_topic(topic: dict, chart_key: str):
     render_section_head(topic)
+
+    # 키워드 선택은 각 섹션 소제목 바로 아래에 배치한다.
+    if topic["filterable"]:
+        active_keywords = st.multiselect(
+            "검색 키워드",
+            options=topic["keywords"],
+            default=topic["keywords"],
+            key=f"kw-{topic['id']}",
+            label_visibility="collapsed",
+        )
+    else:
+        active_keywords = topic["keywords"]
+        chips = "".join(
+            f'<span class="kw-chip">{html.escape(k)}</span>' for k in topic["keywords"]
+        )
+        st.markdown(f'<div class="kw-row">{chips}</div>', unsafe_allow_html=True)
 
     if not active_keywords:
         st.info("키워드를 하나 이상 선택해주세요.")
@@ -488,36 +521,31 @@ def main():
     st.markdown(APP_CSS, unsafe_allow_html=True)
 
     now = datetime.now().strftime("%Y년 %m월 %d일 %H:%M")
-    st.markdown(
-        '<div class="hd-wrap">'
-        '<span class="hd-eyebrow">실시간 뉴스 모니터링</span>'
-        '<h1 class="hd-title">주요 이슈 뉴스 브리핑</h1>'
-        f'<p class="hd-sub">반도체 · 금리 · 이란 전쟁 · 최근 3일 기사 · {now} 기준 · 네이버 뉴스 검색 API</p>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
-
-    with st.sidebar:
-        st.subheader("검색 설정")
-        selected_semi_keywords = st.multiselect(
-            "반도체 키워드", options=SEMI_KEYWORDS, default=SEMI_KEYWORDS
+    head_left, head_right = st.columns([5, 1], vertical_alignment="bottom")
+    with head_left:
+        st.markdown(
+            '<div class="hd-wrap">'
+            '<span class="hd-eyebrow">실시간 뉴스 모니터링</span>'
+            '<h1 class="hd-title">주요 이슈 뉴스 브리핑</h1>'
+            f'<p class="hd-sub">반도체 · 금리 · 이란 전쟁 · 최근 3일 기사 · {now} 기준 · 네이버 뉴스 검색 API</p>'
+            '</div>',
+            unsafe_allow_html=True,
         )
-        st.caption("금리 · 이란 전쟁 섹션은 고정 키워드로 조회됩니다.")
-        if st.button("최신 기사 다시 불러오기", use_container_width=True):
+    with head_right:
+        if st.button("새로고침", use_container_width=True):
             fetch_news_for_keyword.clear()
             collect_all_news.clear()
             st.rerun()
-        st.divider()
-        st.caption(
-            "논조 분류는 키워드 규칙 기반입니다. "
-            "정교한 분류가 필요하면 classify() 함수를 LLM 호출로 교체하세요."
-        )
 
     for i, topic in enumerate(TOPICS):
-        keywords = selected_semi_keywords if topic["filterable"] else topic["keywords"]
-        render_topic(topic, keywords, chart_key=f"chart-{topic['id']}")
+        render_topic(topic, chart_key=f"chart-{topic['id']}")
         if i < len(TOPICS) - 1:
             st.markdown('<div class="sec-gap"></div>', unsafe_allow_html=True)
+
+    st.caption(
+        "논조 분류는 키워드 규칙 기반입니다. "
+        "정교한 분류가 필요하면 classify() 함수를 LLM 호출로 교체하세요."
+    )
 
 
 if __name__ == "__main__":
