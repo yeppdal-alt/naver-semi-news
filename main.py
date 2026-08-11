@@ -22,8 +22,8 @@ import streamlit as st
 
 NAVER_NEWS_URL = "https://naverapihub.apigw.ntruss.com/search/v1/news"
 
-TOP_N = 10  # 감성별 표시 기사 수
-FETCH_DISPLAY = 20  # 키워드당 조회 건수 (top10 채우기 위해 넉넉히 확보)
+TOP_N = 5  # 감성별 표시 기사 수
+FETCH_DISPLAY = 30  # 키워드당 조회 건수 (제목 필터링 후에도 top5를 채우기 위해 넉넉히 확보)
 DESC_TRUNCATE_RATIO = 0.5  # 기사 요약 길이 축소 비율
 DESC_MIN_LEN = 35  # 축소 시 최소 보장 길이
 
@@ -255,6 +255,11 @@ def collect_all_news(keywords: tuple, pos_words: tuple, neg_words: tuple, max_ag
 
         title = strip_html(it.get("title", ""))
         desc = strip_html(it.get("description", ""))
+
+        # 검색 키워드가 제목에 실제로 포함된 기사만 채택 (본문/요약만 일치하는 기사는 제외)
+        if it["_keyword"] not in title:
+            continue
+
         key = normalize_key(title)
 
         if key in seen:
