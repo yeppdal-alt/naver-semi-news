@@ -12,7 +12,7 @@ import html
 from datetime import datetime, timedelta
 
 import requests
-import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
 # ----------------------------------------------------------------------------
@@ -32,7 +32,69 @@ NEG_WORDS = [
     "재고 증가", "가격 하락", "위축", "우려", "쇼크", "약세", "감원",
 ]
 
+TOP_N = 10  # 감성별 표시 기사 수
+FETCH_DISPLAY = 20  # 키워드당 조회 건수 (top10 채우기 위해 넉넉히 확보)
+
+# 신문 편집 톤앤매너 (딥그린 + 세리프 + 오프화이트)
+GREEN = "#1b4332"
+NEG_RED = "#7a2a1f"
+NEUTRAL_GRAY = "#5c5c58"
+SENTIMENT_COLORS = {"긍정": GREEN, "부정": NEG_RED, "중립": NEUTRAL_GRAY}
+
 st.set_page_config(page_title="반도체 뉴스 감성 대시보드", layout="wide")
+
+NEWSPAPER_CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700&display=swap');
+
+.stApp { background-color: #faf9f5; }
+.block-container { padding-top: 2.2rem; max-width: 1200px; }
+
+.np-kicker {
+    font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+    color: #5c5c58; margin-bottom: 4px;
+}
+.np-title {
+    font-family: 'Noto Serif KR', Georgia, serif;
+    font-size: 38px; font-weight: 700; margin: 0 0 12px 0; color: #1a1a1a;
+}
+.np-rule { border-top: 3px solid #1a1a1a; border-bottom: 1px solid #1a1a1a; height: 4px; margin-bottom: 22px; }
+.np-section-label {
+    display: inline-block; background: #1b4332; color: #fff;
+    font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+    padding: 4px 12px; margin: 10px 0 14px 0;
+}
+.np-heading {
+    font-family: 'Noto Serif KR', Georgia, serif; font-size: 22px; font-weight: 700;
+    margin: 6px 0 4px 0; padding-bottom: 6px; border-bottom: 3px solid #1a1a1a;
+}
+.np-quote {
+    font-family: 'Noto Serif KR', Georgia, serif; font-style: italic; font-size: 17px;
+    line-height: 1.6; border-left: 4px solid #1b4332; background: #ffffff;
+    padding: 14px 20px; margin: 4px 0 10px 0;
+}
+[data-testid="stMetric"] {
+    background: #ffffff; border-top: 2px solid #1a1a1a; border-radius: 0;
+    padding: 10px 4px 6px 12px;
+}
+[data-testid="stMetricLabel"] p { text-transform: uppercase; letter-spacing: .06em; font-size: 11px !important; color: #5c5c58 !important; }
+[data-testid="stMetricValue"] { font-family: 'Noto Serif KR', Georgia, serif; }
+
+.np-col-header {
+    display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .1em;
+    text-transform: uppercase; color: #fff; padding: 4px 12px; margin-bottom: 14px;
+}
+.np-article { border-bottom: 1px solid #d8d6cd; padding: 13px 0; }
+.np-article-title {
+    font-family: 'Noto Serif KR', Georgia, serif; font-size: 16px; font-weight: 700;
+    color: #1a1a1a; text-decoration: none; line-height: 1.35; display: block;
+}
+.np-article-title:hover { color: #1b4332; text-decoration: underline; }
+.np-meta { font-size: 11px; letter-spacing: .03em; text-transform: uppercase; color: #5c5c58; margin: 6px 0 8px 0; }
+.np-desc { font-family: 'Noto Serif KR', Georgia, serif; font-size: 14px; color: #3a3a37; line-height: 1.55; margin-bottom: 4px; }
+.np-reason { font-size: 12px; color: #5c5c58; font-style: italic; }
+</style>
+"""
 
 
 # ----------------------------------------------------------------------------
@@ -91,7 +153,7 @@ def get_naver_headers():
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def fetch_news_for_keyword(keyword: str, display: int = 10):
+def fetch_news_for_keyword(keyword: str, display: int = FETCH_DISPLAY):
     headers = get_naver_headers()
     params = {"query": keyword, "display": display, "sort": "date"}
     resp = requests.get(NAVER_NEWS_URL, headers=headers, params=params, timeout=10)
@@ -148,8 +210,18 @@ def collect_all_news(keywords: tuple, max_age_days: int = 3):
 # UI
 # ----------------------------------------------------------------------------
 
+def section_label(text: str):
+    st.markdown(f'<div class="np-section-label">{html.escape(text)}</div>', unsafe_allow_html=True)
+
+
 def main():
-    st.title("반도체 섹터 뉴스 감성 대시보드")
+    st.markdown(NEWSPAPER_CSS, unsafe_allow_html=True)
+    st.markdown(
+        '<div class="np-kicker">Semiconductor Sector · Live Sentiment Wire</div>'
+        '<div class="np-title">반도체 뉴스 감성 대시보드</div>'
+        '<div class="np-rule"></div>',
+        unsafe_allow_html=True,
+    )
     st.caption(
         "데이터 출처: 네이버 뉴스 검색 API · "
         "API 가이드: https://guide.ncloud-docs.com/docs/home"
@@ -180,6 +252,7 @@ def main():
     for a in articles:
         counts[a["sentiment"]] += 1
 
+    section_label("Top News")
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("긍정 기사", counts["긍정"])
     col2.metric("부정 기사", counts["부정"])
@@ -192,36 +265,68 @@ def main():
         tone = "부정 기사가 우세해 주의가 필요한 뉴스 흐름입니다."
     else:
         tone = "긍정과 부정 기사가 비슷한 수준으로, 방향성이 뚜렷하지 않습니다."
-    st.info(tone)
+    st.markdown(f'<div class="np-quote">{html.escape(tone)}</div>', unsafe_allow_html=True)
 
-    st.subheader("최근 조회 시점 기준 감성 비율")
-    ratio_df = pd.DataFrame(
-        {"건수": [counts["긍정"], counts["부정"], counts["중립"]]},
-        index=["긍정", "부정", "중립"],
+    section_label("Sentiment Trend")
+    labels = ["긍정", "부정", "중립"]
+    values = [counts[l] for l in labels]
+    fig = go.Figure(
+        data=[
+            go.Bar(
+                x=labels,
+                y=values,
+                marker_color=[SENTIMENT_COLORS[l] for l in labels],
+                text=values,
+                textposition="outside",
+            )
+        ]
     )
-    st.bar_chart(ratio_df)
-
-    st.subheader("기사 목록")
-    tab_pos, tab_neg, tab_neu = st.tabs(
-        [f"긍정 ({counts['긍정']})", f"부정 ({counts['부정']})", f"중립 ({counts['중립']})"]
+    fig.update_layout(
+        height=280,
+        margin=dict(l=10, r=10, t=10, b=10),
+        yaxis_title="기사 건수",
+        showlegend=False,
+        plot_bgcolor="#ffffff",
+        paper_bgcolor="#ffffff",
+        font=dict(family="Georgia, 'Noto Serif KR', serif", color="#1a1a1a"),
     )
+    fig.update_xaxes(showgrid=False, linecolor="#1a1a1a")
+    fig.update_yaxes(showgrid=True, gridcolor="#e5e3da")
+    st.plotly_chart(fig, use_container_width=True)
 
-    def render_articles(container, sentiment):
-        items = [a for a in articles if a["sentiment"] == sentiment]
+    st.markdown(f'<h2 class="np-heading">Latest News · Top {TOP_N}</h2>', unsafe_allow_html=True)
+
+    def top_articles(sentiment):
+        return [a for a in articles if a["sentiment"] == sentiment][:TOP_N]
+
+    col_pos, col_neg, col_neu = st.columns(3)
+
+    def render_column(container, sentiment, color):
+        items = top_articles(sentiment)
+        container.markdown(
+            f'<span class="np-col-header" style="background:{color}">{sentiment} ({len(items)})</span>',
+            unsafe_allow_html=True,
+        )
         if not items:
             container.write("해당하는 기사가 없습니다.")
             return
+        cards = []
         for a in items:
-            with container.container(border=True):
-                st.markdown(f"**[{a['title']}]({a['link']})**")
-                time_str = a["pub_date"].strftime("%m/%d %H:%M") if a["pub_date"] else a["pub_date_raw"]
-                st.caption(f"{time_str} · {', '.join(sorted(a['keywords']))}")
-                st.write(a["description"])
-                st.caption(f"분류 근거: {a['reason']}")
+            time_str = a["pub_date"].strftime("%m/%d %H:%M") if a["pub_date"] else a["pub_date_raw"]
+            meta = f"{time_str} · {', '.join(sorted(a['keywords']))}"
+            cards.append(
+                '<div class="np-article">'
+                f'<a class="np-article-title" href="{html.escape(a["link"] or "", quote=True)}" target="_blank" rel="noopener">{html.escape(a["title"])}</a>'
+                f'<div class="np-meta">{html.escape(meta)}</div>'
+                f'<div class="np-desc">{html.escape(a["description"])}</div>'
+                f'<div class="np-reason">{html.escape(a["reason"] or "")}</div>'
+                '</div>'
+            )
+        container.markdown("".join(cards), unsafe_allow_html=True)
 
-    render_articles(tab_pos, "긍정")
-    render_articles(tab_neg, "부정")
-    render_articles(tab_neu, "중립")
+    render_column(col_pos, "긍정", SENTIMENT_COLORS["긍정"])
+    render_column(col_neg, "부정", SENTIMENT_COLORS["부정"])
+    render_column(col_neu, "중립", SENTIMENT_COLORS["중립"])
 
     st.caption(
         "※ 감성 분류는 키워드 기반 자동 분류입니다. 정교한 분류가 필요하면 "
