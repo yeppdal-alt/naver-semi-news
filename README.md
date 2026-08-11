@@ -10,13 +10,18 @@
 
 ## 1. 네이버 API 키 발급
 
-네이버 오픈 API(Client ID / Client Secret) 발급 및 사용법은 공식 가이드를 참고하세요.
+NAVER Cloud Platform 콘솔(VPC) > AI·NAVER API > Application 에서 애플리케이션을 등록하고
+"NAVER 검색 > 뉴스" API를 추가한 뒤 인증 정보를 발급받으세요. 가이드:
 https://guide.ncloud-docs.com/docs/home
 
 발급 후 아래 두 값을 확보합니다.
 
-- `NAVER_CLIENT_ID`
-- `NAVER_CLIENT_SECRET`
+- `NAVER_CLIENT_ID` (콘솔의 Client ID, 헤더명 `X-NCP-APIGW-API-KEY-ID`)
+- `NAVER_CLIENT_SECRET` (콘솔의 Client Secret, 헤더명 `X-NCP-APIGW-API-KEY`)
+
+> NAVER Cloud Platform 콘솔에서 발급한 키는 개발자센터(developers.naver.com)의 예전
+> Open API 키와 인증 방식이 다릅니다. `main.py`는 NCP 콘솔 키 기준
+> (`https://naveropenapi.apigw.ntruss.com`, `X-NCP-APIGW-API-KEY-ID`/`X-NCP-APIGW-API-KEY` 헤더)으로 작성되어 있습니다.
 
 ## 2. 로컬 실행
 
