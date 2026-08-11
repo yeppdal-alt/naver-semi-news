@@ -93,7 +93,6 @@ TOPICS = [
         "exclude_words": [],
         "pos_words": SEMI_POS,
         "neg_words": SEMI_NEG,
-        "filterable": True,
     },
     {
         "id": "rates",
@@ -105,7 +104,6 @@ TOPICS = [
         "exclude_words": [],
         "pos_words": RATE_POS,
         "neg_words": RATE_NEG,
-        "filterable": False,
     },
     {
         "id": "iran_war",
@@ -117,7 +115,6 @@ TOPICS = [
         "exclude_words": IRAN_EXCLUDE,
         "pos_words": IRAN_POS,
         "neg_words": IRAN_NEG,
-        "filterable": False,
     },
 ]
 
@@ -160,11 +157,6 @@ section[data-testid="stSidebar"], div[data-testid="stSidebarCollapsedControl"] {
 .sec-sub { font-size: 13px; color: #9096a5; margin-left: 2px; }
 
 /* 섹션 내 키워드 컨트롤 */
-.kw-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px 0; }
-.kw-chip {
-    background: #eef2ff; color: #4f46e5; border: 1px solid #dfe4ff;
-    font-size: 11.5px; font-weight: 500; padding: 3px 10px; border-radius: 999px;
-}
 div[data-testid="stMultiSelect"] { margin-bottom: 10px; }
 div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div {
     background: #ffffff; border: 1px solid #e8eaf1; border-radius: 10px; min-height: 38px;
@@ -460,20 +452,13 @@ def render_topic(topic: dict, chart_key: str):
     render_section_head(topic)
 
     # 키워드 선택은 각 섹션 소제목 바로 아래에 배치한다.
-    if topic["filterable"]:
-        active_keywords = st.multiselect(
-            "검색 키워드",
-            options=topic["keywords"],
-            default=topic["keywords"],
-            key=f"kw-{topic['id']}",
-            label_visibility="collapsed",
-        )
-    else:
-        active_keywords = topic["keywords"]
-        chips = "".join(
-            f'<span class="kw-chip">{html.escape(k)}</span>' for k in topic["keywords"]
-        )
-        st.markdown(f'<div class="kw-row">{chips}</div>', unsafe_allow_html=True)
+    active_keywords = st.multiselect(
+        "검색 키워드",
+        options=topic["keywords"],
+        default=topic["keywords"],
+        key=f"kw-{topic['id']}",
+        label_visibility="collapsed",
+    )
 
     if not active_keywords:
         st.info("키워드를 하나 이상 선택해주세요.")
