@@ -332,29 +332,35 @@ def render_topic(topic: dict, active_keywords: list, chart_key: str):
 
     section_label("Sentiment Trend")
     labels = ["긍정", "부정", "중립"]
-    values = [counts[l] for l in labels]
-    fig = go.Figure(
-        data=[
+    total = max(sum(counts[l] for l in labels), 1)
+    fig = go.Figure()
+    for l in labels:
+        pct = counts[l] / total * 100
+        fig.add_trace(
             go.Bar(
-                x=labels,
-                y=values,
-                marker_color=[SENTIMENT_COLORS[l] for l in labels],
-                text=values,
-                textposition="outside",
+                y=["sentiment"],
+                x=[counts[l]],
+                orientation="h",
+                name=l,
+                marker_color=SENTIMENT_COLORS[l],
+                text=f"{l} {counts[l]} ({pct:.0f}%)" if counts[l] > 0 else "",
+                textposition="inside",
+                insidetextanchor="middle",
+                textfont=dict(color="#ffffff", size=12),
+                hovertemplate=f"{l}: %{{x}}건<extra></extra>",
             )
-        ]
-    )
+        )
     fig.update_layout(
-        height=280,
-        margin=dict(l=10, r=10, t=10, b=10),
-        yaxis_title="기사 건수",
+        barmode="stack",
+        height=64,
+        margin=dict(l=0, r=0, t=4, b=4),
         showlegend=False,
         plot_bgcolor="#ffffff",
         paper_bgcolor="#ffffff",
         font=dict(family="Georgia, 'Noto Serif KR', serif", color="#1a1a1a"),
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
     )
-    fig.update_xaxes(showgrid=False, linecolor="#1a1a1a")
-    fig.update_yaxes(showgrid=True, gridcolor="#e5e3da")
     st.plotly_chart(fig, use_container_width=True, key=chart_key)
 
     st.markdown(f'<h2 class="np-heading">Latest News · Top {TOP_N}</h2>', unsafe_allow_html=True)
