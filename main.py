@@ -19,7 +19,7 @@ import streamlit as st
 # 설정
 # ----------------------------------------------------------------------------
 
-NAVER_NEWS_URL = "https://naveropenapi.apigw.ntruss.com/v1/search/news.json"
+NAVER_NEWS_URL = "https://naverapihub.apigw.ntruss.com/search/v1/news"
 
 KEYWORDS = ["반도체", "삼성전자 반도체", "SK하이닉스", "HBM", "파운드리", "메모리 반도체"]
 
