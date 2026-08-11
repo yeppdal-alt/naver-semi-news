@@ -1,5 +1,5 @@
 """
-멀티 섹션 뉴스 감성 분석 대시보드 (Streamlit Cloud 배포용)
+멀티 섹션 뉴스 브리핑 대시보드 (Streamlit Cloud 배포용)
 반도체 / 금리 / 이란 전쟁 세 섹션을 동일한 포맷으로 보여준다.
 
 - 데이터 소스: 네이버 뉴스 검색 API
@@ -22,7 +22,7 @@ import streamlit as st
 
 NAVER_NEWS_URL = "https://naverapihub.apigw.ntruss.com/search/v1/news"
 
-TOP_N = 5  # 감성별 표시 기사 수
+TOP_N = 5  # 논조별 표시 기사 수
 FETCH_DISPLAY = 30  # 키워드당 조회 건수 (제목 필터링 후에도 top5를 채우기 위해 넉넉히 확보)
 DESC_TRUNCATE_RATIO = 0.5  # 기사 요약 길이 축소 비율
 DESC_MIN_LEN = 35  # 축소 시 최소 보장 길이
@@ -40,6 +40,8 @@ SENTIMENT_BG = {"긍정": "#e7f7f0", "부정": "#fdeced", "중립": "#f1f2f6"}
 # ----------------------------------------------------------------------------
 
 SEMI_KEYWORDS = ["반도체", "삼성전자 반도체", "SK하이닉스", "HBM", "파운드리", "메모리 반도체"]
+# 제목 필터용 토큰 — 검색어와 달리 실제 기사 제목에 그대로 등장하는 짧은 단어를 쓴다.
+SEMI_TITLE_TOKENS = ["반도체", "하이닉스", "HBM", "파운드리", "메모리", "삼성전자"]
 SEMI_POS = [
     "급등", "사상 최대", "역대 최대", "호황", "수주", "공급계약", "목표주가 상향",
     "상향", "증설", "투자 확대", "신기록", "흑자전환", "실적 서프라이즈", "훈풍", "강세",
@@ -50,6 +52,7 @@ SEMI_NEG = [
 ]
 
 RATE_KEYWORDS = ["기준금리", "한국은행 금리", "미국 기준금리", "연준 금리", "금리 인하", "국고채 금리"]
+RATE_TITLE_TOKENS = ["금리", "연준", "한국은행", "한은", "국고채", "물가", "CPI", "인플레"]
 RATE_POS = [
     "금리 인하", "인하 기대", "비둘기파", "완화적", "인하 단행", "피벗",
     "긴축 완화", "금리 동결", "물가 안정",
@@ -59,13 +62,24 @@ RATE_NEG = [
     "긴축 기조", "고금리 장기화", "금리 쇼크",
 ]
 
-IRAN_KEYWORDS = ["이란 전쟁", "이란 이스라엘", "중동 분쟁", "이란 공습", "호르무즈 해협", "이란 미사일"]
+IRAN_KEYWORDS = [
+    "이란", "호르무즈 해협", "미국 이란 협상", "이란 해상봉쇄",
+    "하메네이", "후티 반군", "이란 유가",
+]
+IRAN_TITLE_TOKENS = [
+    "이란", "호르무즈", "하메네이", "후티", "중동", "홍해", "테헤란", "페제시키안",
+]
+# 국가명 '이란'이 스포츠 기사에서 자주 등장해 이를 걸러낸다.
+IRAN_EXCLUDE = [
+    "아시안컵", "대표팀", "축구", "농구", "월드컵", "올림픽", "K리그", "감독 선임", "예선",
+]
 IRAN_POS = [
-    "휴전", "협상 타결", "갈등 완화", "긴장 완화", "종전", "평화협정", "확전 자제", "휴전 합의",
+    "휴전", "협상 타결", "합의 근접", "갈등 완화", "긴장 완화", "종전", "평화협정",
+    "확전 자제", "휴전 합의", "협상 진전", "재개방", "봉쇄 해제",
 ]
 IRAN_NEG = [
     "공습", "확전", "미사일 공격", "사상자", "전면전", "보복", "긴장 고조",
-    "무력 충돌", "폭격", "군사 개입", "긴급 사태",
+    "무력 충돌", "폭격", "군사 개입", "긴급 사태", "피격", "봉쇄", "협상 교착", "유가 급등",
 ]
 
 TOPICS = [
@@ -75,6 +89,8 @@ TOPICS = [
         "title": "반도체",
         "subtitle": "메모리 · 파운드리 · HBM 관련 최신 보도",
         "keywords": SEMI_KEYWORDS,
+        "title_tokens": SEMI_TITLE_TOKENS,
+        "exclude_words": [],
         "pos_words": SEMI_POS,
         "neg_words": SEMI_NEG,
         "filterable": True,
@@ -85,6 +101,8 @@ TOPICS = [
         "title": "금리",
         "subtitle": "기준금리 · 연준 · 국고채 동향",
         "keywords": RATE_KEYWORDS,
+        "title_tokens": RATE_TITLE_TOKENS,
+        "exclude_words": [],
         "pos_words": RATE_POS,
         "neg_words": RATE_NEG,
         "filterable": False,
@@ -93,8 +111,10 @@ TOPICS = [
         "id": "iran_war",
         "badge": "국제정세",
         "title": "이란 전쟁",
-        "subtitle": "중동 분쟁 · 호르무즈 해협 리스크",
+        "subtitle": "미·이란 협상 · 호르무즈 해협 · 유가 리스크",
         "keywords": IRAN_KEYWORDS,
+        "title_tokens": IRAN_TITLE_TOKENS,
+        "exclude_words": IRAN_EXCLUDE,
         "pos_words": IRAN_POS,
         "neg_words": IRAN_NEG,
         "filterable": False,
@@ -265,7 +285,14 @@ def fetch_news_for_keyword(keyword: str, display: int = FETCH_DISPLAY):
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def collect_all_news(keywords: tuple, pos_words: tuple, neg_words: tuple, max_age_days: int = 3):
+def collect_all_news(
+    keywords: tuple,
+    title_tokens: tuple,
+    exclude_words: tuple,
+    pos_words: tuple,
+    neg_words: tuple,
+    max_age_days: int = 3,
+):
     all_items = []
     for kw in keywords:
         try:
@@ -284,8 +311,14 @@ def collect_all_news(keywords: tuple, pos_words: tuple, neg_words: tuple, max_ag
         title = strip_html(it.get("title", ""))
         desc = strip_html(it.get("description", ""))
 
-        # 검색 키워드가 제목에 실제로 포함된 기사만 채택 (본문/요약만 일치하는 기사는 제외)
-        if it["_keyword"] not in title:
+        # 토픽 토큰이 제목에 실제로 포함된 기사만 채택 (요약문만 일치하는 기사는 제외).
+        # 검색어는 다어절이라 제목에 그대로 안 나오는 경우가 많아 별도 토큰으로 판정한다.
+        tokens = title_tokens or (it["_keyword"],)
+        if not any(tok in title for tok in tokens):
+            continue
+
+        # 동명이의 노이즈 제외 (예: 국가명 '이란'이 등장하는 스포츠 기사)
+        if any(bad in title for bad in exclude_words):
             continue
 
         key = normalize_key(title)
@@ -415,7 +448,11 @@ def render_topic(topic: dict, active_keywords: list, chart_key: str):
 
     with st.spinner(f"{topic['title']} 뉴스 불러오는 중..."):
         articles = collect_all_news(
-            tuple(active_keywords), tuple(topic["pos_words"]), tuple(topic["neg_words"])
+            tuple(active_keywords),
+            tuple(topic.get("title_tokens", [])),
+            tuple(topic.get("exclude_words", [])),
+            tuple(topic["pos_words"]),
+            tuple(topic["neg_words"]),
         )
 
     if not articles:
@@ -472,7 +509,7 @@ def main():
             st.rerun()
         st.divider()
         st.caption(
-            "감성 분류는 키워드 규칙 기반입니다. "
+            "논조 분류는 키워드 규칙 기반입니다. "
             "정교한 분류가 필요하면 classify() 함수를 LLM 호출로 교체하세요."
         )
 
