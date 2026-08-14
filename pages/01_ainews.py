@@ -32,6 +32,7 @@ VIDEOS_PER_ARTICLE = 2
 DESC_TRUNCATE_RATIO = 0.5
 DESC_MIN_LEN = 35
 DUPLICATE_SIMILARITY = 0.5  # 이 이상이면 다른 언론사가 같은 사건을 다룬 기사로 간주해 하나만 채택
+SHARE_FETCH_DISPLAY = 100  # 검색 비중 계산용 - 인기 키워드가 FETCH_DISPLAY(30)에서 전부 잘려 동률나는 것 방지
 
 # 비전공자 학습 적합도 판별 키워드 — 많이 맞을수록 입문자에게 도움되는 기사로 간주
 AI_LEARNING_WORDS = [
@@ -350,7 +351,7 @@ def collect_keyword_share(max_age_days: int = MAX_AGE_DAYS) -> dict:
     for item in KEYWORD_SHARE_ITEMS:
         kw = item["keyword"]
         try:
-            raw_items = fetch_news_for_keyword(kw)
+            raw_items = fetch_news_for_keyword(kw, display=SHARE_FETCH_DISPLAY)
         except requests.RequestException as e:
             st.warning(f"'{kw}' 검색 중 오류: {e}")
             raw_items = []
