@@ -1,7 +1,7 @@
 """
 AI 뉴스 브리핑 대시보드 (Streamlit 멀티페이지)
 클로드 / 챗GPT·제미나이 / 기타(딥시크·업스테이지·퍼플렉시티 등) 3개 그룹으로 나눠
-비전공자 학습에 도움이 되는 기사 Top 5와 관련 학습 동영상을 함께 보여준다.
+비전공자 학습에 도움이 되는 기사 Top 7과 관련 학습 동영상을 함께 보여준다.
 
 - 뉴스 소스: 네이버 뉴스 검색 API (main.py와 동일한 NAVER API HUB 엔드포인트)
 - 동영상 소스: 유튜브 검색결과 페이지 (별도 API 키 불필요)
@@ -25,7 +25,7 @@ import streamlit as st
 NAVER_NEWS_URL = "https://naverapihub.apigw.ntruss.com/search/v1/news"
 YOUTUBE_SEARCH_URL = "https://www.youtube.com/results"
 
-TOP_N = 5
+TOP_N = 7
 FETCH_DISPLAY = 30
 MAX_AGE_DAYS = 14  # 학습 콘텐츠는 속보성 뉴스보다 조회 기간을 넉넉히 잡는다
 VIDEOS_PER_ARTICLE = 2
@@ -40,7 +40,7 @@ AI_LEARNING_WORDS = [
     "활용법", "사용법", "강좌", "기초", "처음", "시작하기", "쉽게", "정리", "차이점", "노하우",
 ]
 
-# AI 에이전트 브랜드별 그룹 — 각 그룹 독립적으로 검색/필터링 후 그룹별 Top 5를 나란히 보여준다.
+# AI 에이전트 브랜드별 그룹 — 각 그룹 독립적으로 검색/필터링 후 그룹별 Top 7을 나란히 보여준다.
 AI_GROUPS = [
     {
         "id": "claude",
@@ -555,19 +555,19 @@ def main():
     )
     st.markdown(
         '<div class="tone-bar">그룹별로 클로드 · 챗GPT · 제미나이 · 기타 AI 에이전트 기사를 모아, '
-        '비전공자가 개념을 익히기 좋은 순으로 정렬한 Top 5입니다.</div>',
+        '비전공자가 개념을 익히기 좋은 순으로 정렬한 Top 7입니다.</div>',
         unsafe_allow_html=True,
     )
 
-    group_top5 = {}
+    group_top_articles = {}
     with st.spinner("AI 에이전트 뉴스 불러오는 중..."):
         for group in AI_GROUPS:
             articles = collect_ai_learning_news(
                 tuple(group["keywords"]), tuple(group["title_tokens"]), tuple(AI_LEARNING_WORDS),
             )
-            group_top5[group["id"]] = articles[:TOP_N]
+            group_top_articles[group["id"]] = articles[:TOP_N]
 
-    if not any(group_top5.values()):
+    if not any(group_top_articles.values()):
         st.warning(f"최근 {MAX_AGE_DAYS}일 이내 수집된 AI 에이전트 관련 기사가 없습니다.")
         return
 
@@ -582,12 +582,12 @@ def main():
 
     cols = st.columns(len(AI_GROUPS), gap="small")
     for col, group in zip(cols, AI_GROUPS):
-        render_group_column(col, group, group_top5[group["id"]])
+        render_group_column(col, group, group_top_articles[group["id"]])
 
     st.markdown('<div class="sec-gap"></div>', unsafe_allow_html=True)
     st.markdown('<div class="video-head">🎥 관련 학습 동영상 컨텐츠</div>', unsafe_allow_html=True)
 
-    video_source_titles = [a["title"] for group in AI_GROUPS for a in group_top5[group["id"]][:2]]
+    video_source_titles = [a["title"] for group in AI_GROUPS for a in group_top_articles[group["id"]][:2]]
     with st.spinner("관련 학습 동영상 불러오는 중..."):
         videos = collect_related_videos(video_source_titles)
 
