@@ -1,7 +1,7 @@
 """
 AI 뉴스 브리핑 대시보드 (Streamlit 멀티페이지)
-클로드 · 챗GPT · 제미나이 등 AI 에이전트 관련 기사 중, 비전공자 학습에
-도움이 되는 기사 Top 5와 관련 학습 동영상을 함께 보여준다.
+클로드 / 챗GPT·제미나이 / 기타(딥시크·업스테이지·퍼플렉시티 등) 3개 그룹으로 나눠
+비전공자 학습에 도움이 되는 기사 Top 5와 관련 학습 동영상을 함께 보여준다.
 
 - 뉴스 소스: 네이버 뉴스 검색 API (main.py와 동일한 NAVER API HUB 엔드포인트)
 - 동영상 소스: 유튜브 검색결과 페이지 (별도 API 키 불필요)
@@ -30,12 +30,41 @@ VIDEOS_PER_ARTICLE = 2
 DESC_TRUNCATE_RATIO = 0.5
 DESC_MIN_LEN = 35
 
-AI_KEYWORDS = ["클로드 AI", "챗GPT", "제미나이 AI", "AI 에이전트"]
-AI_TITLE_TOKENS = ["클로드", "챗GPT", "GPT", "제미나이", "에이전트", "Gemini", "ChatGPT", "Claude", "오픈AI", "OpenAI"]
 # 비전공자 학습 적합도 판별 키워드 — 많이 맞을수록 입문자에게 도움되는 기사로 간주
 AI_LEARNING_WORDS = [
     "초보자", "입문", "비전공자", "가이드", "배우기", "튜토리얼", "따라하기",
     "활용법", "사용법", "강좌", "기초", "처음", "시작하기", "쉽게", "정리", "차이점", "노하우",
+]
+
+# AI 에이전트 브랜드별 그룹 — 각 그룹 독립적으로 검색/필터링 후 그룹별 Top 5를 나란히 보여준다.
+AI_GROUPS = [
+    {
+        "id": "claude",
+        "label": "클로드",
+        "color": "#d97757",
+        "bg": "#fdf0ec",
+        "keywords": ["클로드 AI", "클로드 코드", "앤스로픽"],
+        "title_tokens": ["클로드", "Claude", "앤스로픽", "Anthropic"],
+    },
+    {
+        "id": "gpt_gemini",
+        "label": "챗GPT · 제미나이",
+        "color": "#10a37f",
+        "bg": "#e6f7f1",
+        "keywords": ["챗GPT", "오픈AI", "제미나이 AI", "구글 제미나이"],
+        "title_tokens": ["챗GPT", "GPT", "ChatGPT", "오픈AI", "OpenAI", "제미나이", "Gemini"],
+    },
+    {
+        "id": "etc",
+        "label": "기타 AI 에이전트",
+        "color": "#7c3aed",
+        "bg": "#f2ecfc",
+        "keywords": ["딥시크", "업스테이지 AI", "솔라 LLM", "퍼플렉시티 AI", "AI 에이전트"],
+        "title_tokens": [
+            "딥시크", "DeepSeek", "업스테이지", "Upstage", "솔라", "Solar",
+            "퍼플렉시티", "Perplexity", "에이전트",
+        ],
+    },
 ]
 
 st.set_page_config(page_title="AI 뉴스 브리핑", page_icon="🤖", layout="wide")
@@ -80,6 +109,14 @@ APP_CSS = """
     border-radius: 8px; padding: 10px 14px; font-size: 13.5px; color: #3b4051;
     margin-bottom: 14px;
 }
+
+/* 그룹(브랜드)별 컬럼 헤더 */
+.col-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 12px; border-radius: 8px; margin-bottom: 8px;
+}
+.col-head-name { font-size: 12.5px; font-weight: 700; }
+.col-head-count { font-size: 11.5px; font-weight: 600; opacity: .75; }
 
 /* 뉴스 카드 리스트 */
 .card-list { background: #ffffff; border: 1px solid #e8eaf1; border-radius: 12px; padding: 2px 14px; }
@@ -350,22 +387,32 @@ def collect_related_videos(article_titles: list):
 # UI
 # ----------------------------------------------------------------------------
 
-def render_news_top5(articles: list):
+def render_group_column(container, group: dict, items: list):
+    container.markdown(
+        f'<div class="col-head" style="background:{group["bg"]}">'
+        f'<span class="col-head-name" style="color:{group["color"]}">{html.escape(group["label"])}</span>'
+        f'<span class="col-head-count" style="color:{group["color"]}">{len(items)}건</span>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    if not items:
+        container.markdown('<div class="empty-note">해당 기사가 없습니다.</div>', unsafe_allow_html=True)
+        return
+
     rows = []
-    for i, a in enumerate(articles):
+    for i, a in enumerate(items):
         time_str = a["pub_date"].strftime("%m/%d %H:%M") if a["pub_date"] else a["pub_date_raw"]
-        meta = f"{time_str} · {', '.join(sorted(a['keywords']))}"
-        tag_html = "".join(f'<span class="ai-tag">#{html.escape(h)}</span>' for h in a["learning_hits"][:4])
+        tag_html = "".join(f'<span class="ai-tag">#{html.escape(h)}</span>' for h in a["learning_hits"][:3])
         rows.append(
             '<div class="news-item">'
-            f'<span class="ai-news-rank">TOP {i + 1}</span>'
+            f'<span class="ai-news-rank" style="background:{group["color"]}">TOP {i + 1}</span>'
             f'<a class="news-title" href="{html.escape(a["link"] or "", quote=True)}" target="_blank" rel="noopener">{html.escape(a["title"])}</a>'
-            f'<div class="news-meta">{html.escape(meta)}</div>'
+            f'<div class="news-meta">{html.escape(time_str)}</div>'
             f'<p class="news-desc">{html.escape(shorten(a["description"]))}</p>'
             f'<div class="ai-news-tags">{tag_html}</div>'
             '</div>'
         )
-    st.markdown(f'<div class="card-list">{"".join(rows)}</div>', unsafe_allow_html=True)
+    container.markdown(f'<div class="card-list">{"".join(rows)}</div>', unsafe_allow_html=True)
 
 
 def render_videos(videos: list):
@@ -395,7 +442,7 @@ def main():
             '<div class="hd-wrap">'
             '<span class="hd-eyebrow">AI 트렌드 학습 브리핑</span>'
             '<h1 class="hd-title">AI 에이전트 뉴스 브리핑</h1>'
-            f'<p class="hd-sub">클로드 · 챗GPT · 제미나이 등 AI 에이전트 · 비전공자 학습 추천 기사 · {now} 기준 · 네이버 뉴스 검색 API</p>'
+            f'<p class="hd-sub">클로드 · 챗GPT·제미나이 · 기타 AI 에이전트 그룹별 · 비전공자 학습 추천 기사 · {now} 기준 · 네이버 뉴스 검색 API</p>'
             '</div>',
             unsafe_allow_html=True,
         )
@@ -411,35 +458,38 @@ def main():
         '<div class="sec-head">'
         '<span class="sec-badge">AI 트렌드</span>'
         '<span class="sec-title">AI 에이전트</span>'
-        '<span class="sec-sub">클로드 · 챗GPT · 제미나이 관련 최신 보도</span>'
+        '<span class="sec-sub">클로드 · 챗GPT · 제미나이 · 기타(딥시크·업스테이지·퍼플렉시티 등) 그룹별 최신 보도</span>'
         '</div>',
         unsafe_allow_html=True,
     )
-
-    with st.spinner("AI 에이전트 뉴스 불러오는 중..."):
-        articles = collect_ai_learning_news(
-            tuple(AI_KEYWORDS), tuple(AI_TITLE_TOKENS), tuple(AI_LEARNING_WORDS),
-        )
-
-    if not articles:
-        st.warning(f"최근 {MAX_AGE_DAYS}일 이내 수집된 AI 에이전트 관련 기사가 없습니다.")
-        return
-
-    top5 = articles[:TOP_N]
-
     st.markdown(
-        '<div class="tone-bar">클로드 · 챗GPT · 제미나이 등 AI 에이전트 기사 중, '
+        '<div class="tone-bar">그룹별로 클로드 · 챗GPT · 제미나이 · 기타 AI 에이전트 기사를 모아, '
         '비전공자가 개념을 익히기 좋은 순으로 정렬한 Top 5입니다.</div>',
         unsafe_allow_html=True,
     )
 
-    render_news_top5(top5)
+    group_top5 = {}
+    with st.spinner("AI 에이전트 뉴스 불러오는 중..."):
+        for group in AI_GROUPS:
+            articles = collect_ai_learning_news(
+                tuple(group["keywords"]), tuple(group["title_tokens"]), tuple(AI_LEARNING_WORDS),
+            )
+            group_top5[group["id"]] = articles[:TOP_N]
+
+    if not any(group_top5.values()):
+        st.warning(f"최근 {MAX_AGE_DAYS}일 이내 수집된 AI 에이전트 관련 기사가 없습니다.")
+        return
+
+    cols = st.columns(len(AI_GROUPS), gap="small")
+    for col, group in zip(cols, AI_GROUPS):
+        render_group_column(col, group, group_top5[group["id"]])
 
     st.markdown('<div class="sec-gap"></div>', unsafe_allow_html=True)
     st.markdown('<div class="video-head">🎥 관련 학습 동영상 컨텐츠</div>', unsafe_allow_html=True)
 
+    video_source_titles = [a["title"] for group in AI_GROUPS for a in group_top5[group["id"]][:2]]
     with st.spinner("관련 학습 동영상 불러오는 중..."):
-        videos = collect_related_videos([a["title"] for a in top5])
+        videos = collect_related_videos(video_source_titles)
 
     render_videos(videos)
 
