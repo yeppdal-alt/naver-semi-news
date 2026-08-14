@@ -345,7 +345,12 @@ def collect_ai_learning_news(
 
 
 def collect_keyword_share(max_age_days: int = MAX_AGE_DAYS) -> dict:
-    """대표 AI 에이전트 키워드별 최근 기사 수 (기사 목록에는 노출되지 않고 비중 차트에만 사용)."""
+    """대표 AI 에이전트 키워드별 최근 '고유' 기사 수 (기사 목록에는 노출되지 않고 비중 차트에만 사용).
+
+    같은 사건을 여러 언론사가 거의 동일한 제목으로 신디케이션하는 경우가 많아,
+    단순 건수는 실제 이슈 비중보다 신디케이션 노이즈를 더 크게 반영한다.
+    기사 목록과 동일한 유사 제목 판정으로 중복을 걷어낸 뒤 개수를 센다.
+    """
     cutoff = datetime.now().astimezone() - timedelta(days=max_age_days)
     counts = {}
     for item in KEYWORD_SHARE_ITEMS:
@@ -355,13 +360,17 @@ def collect_keyword_share(max_age_days: int = MAX_AGE_DAYS) -> dict:
         except requests.RequestException as e:
             st.warning(f"'{kw}' 검색 중 오류: {e}")
             raw_items = []
-        count = 0
+
+        norm_titles = []
         for it in raw_items:
             pub_dt = parse_pubdate(it.get("pubDate", ""))
             if pub_dt and pub_dt < cutoff:
                 continue
-            count += 1
-        counts[kw] = count
+            norm_title = normalize_title(it.get("title", ""))
+            if any(is_similar_title(norm_title, existing) for existing in norm_titles):
+                continue
+            norm_titles.append(norm_title)
+        counts[kw] = len(norm_titles)
     return counts
 
 
