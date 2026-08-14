@@ -12,8 +12,10 @@ import re
 import html
 import json
 from datetime import datetime, timedelta, timezone
+from difflib import SequenceMatcher
 
 import requests
+import plotly.graph_objects as go
 import streamlit as st
 
 # ----------------------------------------------------------------------------
@@ -29,6 +31,7 @@ MAX_AGE_DAYS = 14  # 학습 콘텐츠는 속보성 뉴스보다 조회 기간을
 VIDEOS_PER_ARTICLE = 2
 DESC_TRUNCATE_RATIO = 0.5
 DESC_MIN_LEN = 35
+DUPLICATE_SIMILARITY = 0.5  # 이 이상이면 다른 언론사가 같은 사건을 다룬 기사로 간주해 하나만 채택
 
 # 비전공자 학습 적합도 판별 키워드 — 많이 맞을수록 입문자에게 도움되는 기사로 간주
 AI_LEARNING_WORDS = [
@@ -59,12 +62,23 @@ AI_GROUPS = [
         "label": "기타 AI 에이전트",
         "color": "#7c3aed",
         "bg": "#f2ecfc",
-        "keywords": ["딥시크", "업스테이지 AI", "솔라 LLM", "퍼플렉시티 AI", "AI 에이전트"],
+        "keywords": ["딥시크", "업스테이지 AI", "솔라 LLM", "퍼플렉시티 AI", "젠스파크 AI", "AI 에이전트"],
         "title_tokens": [
             "딥시크", "DeepSeek", "업스테이지", "Upstage", "솔라", "Solar",
-            "퍼플렉시티", "Perplexity", "에이전트",
+            "퍼플렉시티", "Perplexity", "젠스파크", "Genspark", "에이전트",
         ],
     },
+]
+
+# 대표 AI 에이전트별 검색 비중 차트용 — 기사 목록에는 안 나오고 그래프로만 표시
+KEYWORD_SHARE_ITEMS = [
+    {"keyword": "클로드 AI", "label": "클로드", "color": "#d97757"},
+    {"keyword": "챗GPT", "label": "챗GPT", "color": "#10a37f"},
+    {"keyword": "제미나이 AI", "label": "제미나이", "color": "#4285f4"},
+    {"keyword": "딥시크", "label": "딥시크", "color": "#7c3aed"},
+    {"keyword": "업스테이지 AI", "label": "업스테이지", "color": "#f59e0b"},
+    {"keyword": "퍼플렉시티 AI", "label": "퍼플렉시티", "color": "#0ea5e9"},
+    {"keyword": "젠스파크 AI", "label": "젠스파크", "color": "#ec4899"},
 ]
 
 st.set_page_config(page_title="AI 뉴스 브리핑", page_icon="🤖", layout="wide")
@@ -203,9 +217,15 @@ def strip_html(text: str) -> str:
     return html.unescape(text)
 
 
-def normalize_key(title: str) -> str:
-    key = re.sub(r"[^0-9A-Za-z가-힣]", "", strip_html(title))
-    return key[:18].lower()
+def normalize_title(title: str) -> str:
+    return re.sub(r"[^0-9A-Za-z가-힣]", "", strip_html(title)).lower()
+
+
+def is_similar_title(norm_a: str, norm_b: str, threshold: float = DUPLICATE_SIMILARITY) -> bool:
+    """다른 언론사가 같은 사건을 다르게 제목 붙인 경우를 근사 매칭으로 잡아낸다."""
+    if not norm_a or not norm_b:
+        return False
+    return SequenceMatcher(None, norm_a, norm_b).ratio() >= threshold
 
 
 def parse_pubdate(pub_date: str):
@@ -276,7 +296,8 @@ def collect_ai_learning_news(
         except requests.RequestException as e:
             st.warning(f"'{kw}' 검색 중 오류: {e}")
 
-    seen = {}
+    rows = []
+    norm_titles = []  # rows와 같은 순서로 유지되는 정규화 제목 (근사 중복 판정용)
     cutoff = datetime.now().astimezone() - timedelta(days=max_age_days)
 
     for it in all_items:
@@ -290,14 +311,19 @@ def collect_ai_learning_news(
         if title_tokens and not any(tok in title for tok in title_tokens):
             continue
 
-        key = normalize_key(title)
-        if key in seen:
-            seen[key]["keywords"].add(it["_keyword"])
+        norm_title = normalize_title(title)
+
+        dup_idx = next(
+            (i for i, existing in enumerate(norm_titles) if is_similar_title(norm_title, existing)),
+            None,
+        )
+        if dup_idx is not None:
+            rows[dup_idx]["keywords"].add(it["_keyword"])
             continue
 
         text = title + " " + desc
         hits = [w for w in learning_words if w in text]
-        seen[key] = {
+        rows.append({
             "title": title,
             "description": desc,
             "link": it.get("link") or it.get("originallink"),
@@ -306,15 +332,36 @@ def collect_ai_learning_news(
             "learning_score": len(hits),
             "learning_hits": hits,
             "keywords": {it["_keyword"]},
-        }
+        })
+        norm_titles.append(norm_title)
 
     fallback_dt = datetime.min.replace(tzinfo=timezone.utc)
-    rows = list(seen.values())
     rows.sort(
         key=lambda r: (r["learning_score"], r["pub_date"] or fallback_dt),
         reverse=True,
     )
     return rows
+
+
+def collect_keyword_share(max_age_days: int = MAX_AGE_DAYS) -> dict:
+    """대표 AI 에이전트 키워드별 최근 기사 수 (기사 목록에는 노출되지 않고 비중 차트에만 사용)."""
+    cutoff = datetime.now().astimezone() - timedelta(days=max_age_days)
+    counts = {}
+    for item in KEYWORD_SHARE_ITEMS:
+        kw = item["keyword"]
+        try:
+            raw_items = fetch_news_for_keyword(kw)
+        except requests.RequestException as e:
+            st.warning(f"'{kw}' 검색 중 오류: {e}")
+            raw_items = []
+        count = 0
+        for it in raw_items:
+            pub_dt = parse_pubdate(it.get("pubDate", ""))
+            if pub_dt and pub_dt < cutoff:
+                continue
+            count += 1
+        counts[kw] = count
+    return counts
 
 
 # ----------------------------------------------------------------------------
@@ -415,6 +462,40 @@ def render_group_column(container, group: dict, items: list):
     container.markdown(f'<div class="card-list">{"".join(rows)}</div>', unsafe_allow_html=True)
 
 
+def render_keyword_share_bar(counts: dict, chart_key: str):
+    total = max(sum(counts.get(item["keyword"], 0) for item in KEYWORD_SHARE_ITEMS), 1)
+    fig = go.Figure()
+    for item in KEYWORD_SHARE_ITEMS:
+        c = counts.get(item["keyword"], 0)
+        pct = c / total * 100
+        fig.add_trace(
+            go.Bar(
+                y=["s"],
+                x=[c],
+                orientation="h",
+                name=item["label"],
+                marker=dict(color=item["color"], line=dict(width=0)),
+                text=f"{item['label']} {pct:.0f}%" if pct >= 6 else "",
+                textposition="inside",
+                insidetextanchor="middle",
+                textfont=dict(color="#ffffff", size=11),
+                hovertemplate=f"{item['label']}: %{{x}}건 ({pct:.1f}%)<extra></extra>",
+            )
+        )
+    fig.update_layout(
+        barmode="stack",
+        height=44,
+        margin=dict(l=0, r=0, t=0, b=0),
+        showlegend=False,
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
+        bargap=0,
+    )
+    st.plotly_chart(fig, use_container_width=True, key=chart_key, config={"displayModeBar": False})
+
+
 def render_videos(videos: list):
     if not videos:
         st.markdown('<div class="empty-note">관련 동영상을 찾지 못했습니다.</div>', unsafe_allow_html=True)
@@ -479,6 +560,15 @@ def main():
     if not any(group_top5.values()):
         st.warning(f"최근 {MAX_AGE_DAYS}일 이내 수집된 AI 에이전트 관련 기사가 없습니다.")
         return
+
+    st.markdown(
+        f'<div class="video-head">📊 대표 AI 에이전트 키워드 검색 비중 (최근 {MAX_AGE_DAYS}일)</div>',
+        unsafe_allow_html=True,
+    )
+    with st.spinner("키워드별 검색 비중 계산 중..."):
+        keyword_counts = collect_keyword_share()
+    render_keyword_share_bar(keyword_counts, chart_key="ai-keyword-share")
+    st.markdown('<div class="sec-gap"></div>', unsafe_allow_html=True)
 
     cols = st.columns(len(AI_GROUPS), gap="small")
     for col, group in zip(cols, AI_GROUPS):
