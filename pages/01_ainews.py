@@ -124,6 +124,35 @@ APP_CSS = """
     line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .video-meta { font-size: 11px; color: #9096a5; padding: 0 12px 10px; }
+
+/* 반도체 브리핑 바로가기 버튼: 새로고침 버튼과 같은 모양 + 인디고 색으로 구분 */
+div[data-testid="stPageLink"] {
+    margin-bottom: 8px;
+}
+div[data-testid="stPageLink"] a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: #4f46e5 !important;
+    color: #ffffff !important;
+    border: 1px solid #4f46e5 !important;
+    border-radius: 8px !important;
+    padding: 0.5rem 1rem !important;
+    min-height: 2.5rem;
+    text-decoration: none !important;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+div[data-testid="stPageLink"] a:hover {
+    background: #4338ca !important;
+    border-color: #4338ca !important;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+div[data-testid="stPageLink"] a * {
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+}
 </style>
 """
 
@@ -371,6 +400,7 @@ def main():
             unsafe_allow_html=True,
         )
     with head_right:
+        st.page_link("main.py", label="🖥️ 반도체 브리핑", use_container_width=True)
         if st.button("새로고침", use_container_width=True):
             fetch_news_for_keyword.clear()
             collect_ai_learning_news.clear()
