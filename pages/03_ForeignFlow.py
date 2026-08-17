@@ -1,16 +1,18 @@
-# main.py
+# pages/03_ForeignFlow.py
 # ─────────────────────────────────────────────────────────────
-# 외국인 매수 의지 확인 대시보드 (Streamlit)
+# 외국인 수급 대시보드 (Streamlit 멀티페이지)
 #
 # 1) 종목 코드를 입력하면 외국인이 실제로 사고 있는지 확인해 줍니다.
 #    (네이버 증권의 "외국인·기관 매매동향" 표 + yfinance 주가)
 # 2) 삼성전자·SK하이닉스처럼 여러 종목의 외국인 보유율을
 #    한 그래프에 겹쳐서 비교할 수 있습니다.
 #
-# 실행: streamlit run main.py
+# 디자인은 main.py / 01_AInews.py / 02_ThemeSector.py와 같은
+# 인디고 · 화이트카드 · 라벤더 배경 톤을 공유합니다.
 # ─────────────────────────────────────────────────────────────
 
 import datetime as dt          # 날짜 계산에 사용
+import html as _html           # 종목명·코드를 HTML에 넣을 때 escape 용
 import io                      # 문자열을 파일처럼 다루기 위해
 import time                    # 페이지를 넘길 때 잠깐 쉬어 주기 위해
 
@@ -30,38 +32,97 @@ st.set_page_config(
     layout="wide",
 )
 
-# 다른 페이지로 가는 바로가기 버튼 (다른 페이지들과 같은 인디고 박스 스타일)
-st.markdown(
-    """
-    <style>
-    div[data-testid="stPageLink"] { margin-bottom: 8px; }
-    div[data-testid="stPageLink"] a {
-        display: flex; align-items: center; justify-content: center; gap: 6px;
-        background: #4f46e5 !important; color: #ffffff !important;
-        border: 1px solid #4f46e5 !important; border-radius: 8px !important;
-        padding: 0.5rem 1rem !important; min-height: 2.5rem;
-        text-decoration: none !important;
-        transition: background 0.15s ease, box-shadow 0.15s ease;
-    }
-    div[data-testid="stPageLink"] a:hover {
-        background: #4338ca !important; border-color: #4338ca !important;
-        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
-    }
-    div[data-testid="stPageLink"] a * {
-        color: #ffffff !important; font-weight: 600 !important; font-size: 14px !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+APP_CSS = """
+<style>
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
 
-_nav1, _nav2, _nav3, _nav_rest = st.columns([1, 1, 1, 2.7], gap="small")
-with _nav1:
-    st.page_link("main.py", label="🖥️ 이슈 브리핑", use_container_width=True)
-with _nav2:
-    st.page_link("pages/01_AInews.py", label="🤖 AI 브리핑", use_container_width=True)
-with _nav3:
-    st.page_link("pages/02_ThemeSector.py", label="🧭 섹터 트렌드", use_container_width=True)
+.stApp { background-color: #f7f8fc; }
+.block-container {
+    padding-top: 3.2rem !important;
+    padding-bottom: 3rem;
+    max-width: 1280px;
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* 페이지 헤더 */
+.hd-wrap { margin-bottom: 26px; }
+.hd-eyebrow {
+    display: inline-block; background: #eef2ff; color: #4f46e5;
+    font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 999px;
+    margin-bottom: 12px;
+}
+.hd-title { font-size: 30px; font-weight: 700; color: #101322; margin: 0 0 6px 0; letter-spacing: -0.02em; }
+.hd-sub { font-size: 14px; color: #6b7280; margin: 0; }
+
+/* 섹션 헤더 */
+.sec-head {
+    display: flex; align-items: center; gap: 10px;
+    margin: 0 0 14px 0; padding-bottom: 12px; border-bottom: 1px solid #e8eaf1;
+}
+.sec-badge {
+    background: #eef2ff; color: #4f46e5; font-size: 11px; font-weight: 600;
+    padding: 4px 10px; border-radius: 6px;
+}
+.sec-title { font-size: 20px; font-weight: 700; color: #101322; letter-spacing: -0.01em; }
+.sec-sub { font-size: 13px; color: #9096a5; margin-left: 2px; }
+
+.tone-bar {
+    background: #ffffff; border: 1px solid #e8eaf1; border-left: 3px solid #4f46e5;
+    border-radius: 8px; padding: 10px 14px; font-size: 13.5px; color: #3b4051;
+    margin-bottom: 14px;
+}
+/* 한 줄 판정 박스 - 방향에 따라 왼쪽 선 색만 바뀜 */
+.verdict-good { border-left-color: #0e9f6e; }
+.verdict-bad  { border-left-color: #e02424; }
+.sec-gap { height: 34px; }
+
+/* 지표 카드 */
+div[data-testid="stMetric"] {
+    background: #ffffff; border: 1px solid #e8eaf1; border-radius: 12px;
+    padding: 14px 16px;
+}
+div[data-testid="stMetricLabel"] p { font-size: 12px !important; color: #6b7280 !important; font-weight: 500 !important; }
+div[data-testid="stMetricValue"] { font-size: 22px !important; color: #101322 !important; font-weight: 700 !important; }
+
+/* 원본 데이터 expander를 카드처럼 */
+div[data-testid="stExpander"] {
+    background: #ffffff; border: 1px solid #e8eaf1 !important; border-radius: 12px;
+}
+
+/* 입력 위젯 */
+div[data-testid="stTextInput"] input,
+div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div {
+    background: #ffffff; border: 1px solid #e8eaf1; border-radius: 10px;
+}
+div[data-testid="stMultiSelect"] span[data-baseweb="tag"] {
+    background: #eef2ff !important; color: #4f46e5 !important;
+    border-radius: 6px; font-size: 11.5px; font-weight: 500;
+}
+div[data-testid="stMultiSelect"] span[data-baseweb="tag"] svg { fill: #4f46e5; }
+
+/* 이슈/AI/섹터 바로가기 버튼: 인디고 색 박스 버튼 */
+div[data-testid="stPageLink"] { margin-bottom: 8px; }
+div[data-testid="stPageLink"] a {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    background: #4f46e5 !important; color: #ffffff !important;
+    border: 1px solid #4f46e5 !important; border-radius: 8px !important;
+    padding: 0.5rem 1rem !important; min-height: 2.5rem;
+    text-decoration: none !important;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+div[data-testid="stPageLink"] a:hover {
+    background: #4338ca !important; border-color: #4338ca !important;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+div[data-testid="stPageLink"] a * {
+    color: #ffffff !important; font-weight: 600 !important; font-size: 14px !important;
+}
+</style>
+"""
+st.markdown(APP_CSS, unsafe_allow_html=True)
+
+# 다른 페이지들과 같은 팔레트 (인디고 · 그린 · 레드)
+INDIGO, POS_COLOR, NEG_COLOR = "#4f46e5", "#0e9f6e", "#e02424"
 
 # 네이버 증권은 브라우저가 아닌 접속을 막기 때문에,
 # "나 브라우저야" 라고 알려 주는 표식(User-Agent)을 붙여서 요청합니다.
@@ -272,16 +333,33 @@ def load_foreign_naver(code: str, pages: int = 13) -> pd.DataFrame:
     return df.sort_values("날짜").reset_index(drop=True)
 
 
-# ── 4. 화면 맨 위: 제목과 설명 ─────────────────────────────────
-st.title("🌏 외국인 수급 대시보드")
-st.markdown(
-    """
-    한국 종목이라면 **외국인이 실제로 사고 있는지**를 보유율과 순매매로 확인해 보세요.
-    아래 칸에 종목 코드를 넣으면 지표와 그래프가 바로 나타납니다.
+# ── 4. 화면 맨 위: 제목과 다른 페이지 바로가기 ──────────────────
+head_left, head_right = st.columns([2.6, 3.4], vertical_alignment="bottom")
+with head_left:
+    st.markdown(
+        '<div class="hd-wrap">'
+        '<span class="hd-eyebrow">외국인 매매동향 추적</span>'
+        '<h1 class="hd-title">🌏 외국인 수급</h1>'
+        '<p class="hd-sub">외국인이 실제로 사고 있는지 보유율과 순매매로 확인 '
+        '· 네이버 증권 외국인·기관 매매동향 · Yahoo Finance</p>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+with head_right:
+    nav1, nav2, nav3 = st.columns(3, gap="small")
+    with nav1:
+        st.page_link("main.py", label="🖥️ 이슈 브리핑", use_container_width=True)
+    with nav2:
+        st.page_link("pages/01_AInews.py", label="🤖 AI 브리핑", use_container_width=True)
+    with nav3:
+        st.page_link("pages/02_ThemeSector.py", label="🧭 섹터 트렌드", use_container_width=True)
 
-    - 한국 주식: `005930.KS` (삼성전자), `000660.KS` (SK하이닉스)
-    - 미국 주식: `AAPL` (애플), `NVDA` (엔비디아)
-    """
+st.markdown(
+    '<div class="tone-bar">ℹ️ 아래 칸에 종목 코드를 넣으면 지표와 그래프가 바로 나타납니다. '
+    '한국 주식은 <b>005930.KS</b>(삼성전자) · <b>000660.KS</b>(SK하이닉스)처럼 코스피 <b>.KS</b>, '
+    '코스닥 <b>.KQ</b>를 뒤에 붙여 주세요. 미국 주식은 <b>AAPL</b> · <b>NVDA</b>처럼 티커만 넣으면 됩니다 '
+    '(외국인 보유율은 국내 종목에만 제공돼요).</div>',
+    unsafe_allow_html=True,
 )
 
 # ── 5. 종목 입력창 ─────────────────────────────────────────────
@@ -293,7 +371,10 @@ ticker = st.text_input(
 
 # 입력이 비어 있으면 안내만 하고 여기서 멈춥니다.
 if not ticker:
-    st.info("종목 코드를 입력하면 그래프를 그려 드릴게요.")
+    st.markdown(
+        '<div class="tone-bar">종목 코드를 입력하면 그래프를 그려 드릴게요.</div>',
+        unsafe_allow_html=True,
+    )
     st.stop()
 
 # ── 6. 주가 데이터 불러오기 ────────────────────────────────────
@@ -302,9 +383,10 @@ with st.spinner("주가를 불러오는 중이에요…"):
 
 # 데이터가 없으면 친절하게 알려 주고 멈춥니다.
 if data.empty:
-    st.error(
-        f"`{ticker}` 종목의 데이터를 찾지 못했어요. "
-        "코드를 다시 확인해 주세요. (예: 삼성전자는 `005930.KS`)"
+    st.markdown(
+        f'<div class="tone-bar verdict-bad">❌ <b>{_html.escape(ticker)}</b> 종목의 데이터를 찾지 못했어요. '
+        '코드를 다시 확인해 주세요. (예: 삼성전자는 <b>005930.KS</b>)</div>',
+        unsafe_allow_html=True,
     )
     st.stop()
 
@@ -315,7 +397,14 @@ first_price = float(data["종가"].iloc[0])   # 1년 전 가격
 last_price = float(data["종가"].iloc[-1])   # 가장 최근 가격
 change_pct = (last_price - first_price) / first_price * 100  # 등락률(%)
 
-st.subheader(f"{name}  ·  `{ticker}`")
+st.markdown(
+    '<div class="sec-head">'
+    '<span class="sec-badge">종목</span>'
+    f'<span class="sec-title">{_html.escape(str(name))}</span>'
+    f'<span class="sec-sub">{_html.escape(ticker)}</span>'
+    '</div>',
+    unsafe_allow_html=True,
+)
 
 col1, col2, col3 = st.columns(3)
 
@@ -340,29 +429,38 @@ col3.metric(
 # ═══════════════════════════════════════════════════════════════
 # 8. 외국인, 정말 사고 있을까? — 수급 확인 코너 (네이버 증권 자료)
 # ═══════════════════════════════════════════════════════════════
-st.divider()
-st.header("🌏 외국인, 정말 사고 있을까?")
+st.markdown('<div class="sec-gap"></div>', unsafe_allow_html=True)
 st.markdown(
-    "증권사 리포트의 **말**과 외국인의 **실제 행동**이 같은 방향인지 확인하는 자리예요. "
-    "보유율이 오르고 순매수가 쌓이고 있다면, 말과 행동이 맞아떨어지는 셈입니다. "
-    "자료는 네이버 증권의 *외국인·기관 매매동향*에서 가져옵니다."
+    '<div class="sec-head">'
+    '<span class="sec-badge">수급</span>'
+    '<span class="sec-title">🌏 외국인, 정말 사고 있을까?</span>'
+    '<span class="sec-sub">네이버 증권 외국인·기관 매매동향</span>'
+    '</div>',
+    unsafe_allow_html=True,
+)
+st.markdown(
+    '<div class="tone-bar">증권사 리포트의 <b>말</b>과 외국인의 <b>실제 행동</b>이 같은 방향인지 '
+    '확인하는 자리예요. 보유율이 오르고 순매수가 쌓이고 있다면, 말과 행동이 맞아떨어지는 셈입니다.</div>',
+    unsafe_allow_html=True,
 )
 
 if not is_korean(ticker):
     # 외국인 보유율은 국내 증시에만 있는 지표라 해외 종목에는 없습니다.
-    st.info(
-        "외국인 보유율·순매매 자료는 국내 상장 종목에만 제공돼요. "
-        "`005930.KS` 처럼 한국 종목을 입력하면 이 코너가 채워집니다."
+    st.markdown(
+        '<div class="tone-bar">외국인 보유율·순매매 자료는 국내 상장 종목에만 제공돼요. '
+        '<b>005930.KS</b> 처럼 한국 종목을 입력하면 이 코너가 채워집니다.</div>',
+        unsafe_allow_html=True,
     )
 else:
     with st.spinner("네이버 증권에서 외국인 매매동향을 읽어오는 중이에요…"):
         fdf = load_foreign_naver(to_krx_code(ticker))
 
     if fdf.empty:
-        st.warning(
-            "외국인 수급 데이터를 불러오지 못했어요. "
-            "네이버 증권이 잠시 응답하지 않거나 종목 코드가 상장 종목이 아닐 수 있어요. "
-            "잠시 뒤 다시 시도해 주세요."
+        st.markdown(
+            '<div class="tone-bar verdict-bad">외국인 수급 데이터를 불러오지 못했어요. '
+            '네이버 증권이 잠시 응답하지 않거나 종목 코드가 상장 종목이 아닐 수 있어요. '
+            '잠시 뒤 다시 시도해 주세요.</div>',
+            unsafe_allow_html=True,
         )
     else:
         # ── 8-1. 기간 선택 ────────────────────────────────────
@@ -432,23 +530,27 @@ else:
         # ── 8-2. 한 줄 판정 ───────────────────────────────────
         # 보유율 방향과 누적 순매수 방향을 함께 보고 메시지를 정합니다.
         if diff_share > 0.05 and cum_qty > 0:
-            st.success(
-                f"📗 **말과 행동이 같은 방향이에요.** 최근 {window}거래일 동안 외국인 보유율이 "
+            verdict_class, verdict_text = "verdict-good", (
+                f"📗 <b>말과 행동이 같은 방향이에요.</b> 최근 {window}거래일 동안 외국인 보유율이 "
                 f"{diff_share:+.2f}%p 오르고, {format_shares(cum_qty)}"
                 f"({format_won(cum_won)} 어치)를 순매수했습니다."
             )
         elif diff_share < -0.05 and cum_qty < 0:
-            st.error(
-                f"📕 **행동은 반대예요.** 최근 {window}거래일 동안 외국인 보유율이 "
+            verdict_class, verdict_text = "verdict-bad", (
+                f"📕 <b>행동은 반대예요.</b> 최근 {window}거래일 동안 외국인 보유율이 "
                 f"{diff_share:+.2f}%p 줄고, {format_shares(abs(cum_qty))}를 순매도했습니다. "
                 "매수 추천 리포트와는 결이 다른 흐름이네요."
             )
         else:
-            st.info(
-                f"📘 **아직은 지켜보는 분위기예요.** 최근 {window}거래일 보유율 변화는 "
+            verdict_class, verdict_text = "", (
+                f"📘 <b>아직은 지켜보는 분위기예요.</b> 최근 {window}거래일 보유율 변화는 "
                 f"{diff_share:+.2f}%p, 누적 순매수는 {format_shares(cum_qty)}로 "
                 "뚜렷한 방향이 보이지 않습니다."
             )
+        st.markdown(
+            f'<div class="tone-bar {verdict_class}">{verdict_text}</div>',
+            unsafe_allow_html=True,
+        )
 
         # ── 8-3. 주가와 외국인 보유율 겹쳐 보기 ────────────────
         fig2 = make_subplots(specs=[[{"secondary_y": True}]])  # 왼쪽·오른쪽 축 두 개
@@ -466,7 +568,7 @@ else:
             go.Scatter(
                 x=fdf["날짜"], y=fdf["외국인 보유율"],
                 name="외국인 보유율",
-                line=dict(color="#2A9D8F", width=2.4),
+                line=dict(color=INDIGO, width=2.4),
                 hovertemplate="%{x|%Y.%m.%d}<br>보유율 %{y:.2f}%<extra></extra>",
             ),
             secondary_y=True,
@@ -493,8 +595,8 @@ else:
         if "외국인 순매매량" in fdf.columns and fdf["외국인 순매매량"].notna().any():
             bars = fdf.dropna(subset=["외국인 순매매량"]).tail(60).copy()
             bars["만주"] = bars["외국인 순매매량"] / 1_0000   # 보기 편하게 만 주 단위로
-            # 산 날은 붉게, 판 날은 파랗게
-            colors = ["#E4572E" if v >= 0 else "#3D7EA6" for v in bars["만주"]]
+            # 산 날은 초록, 판 날은 빨강 (다른 페이지의 상승·하락 색과 동일)
+            colors = [POS_COLOR if v >= 0 else NEG_COLOR for v in bars["만주"]]
 
             fig3 = go.Figure(
                 go.Bar(
@@ -531,11 +633,19 @@ else:
 # ═══════════════════════════════════════════════════════════════
 # 9. 두 종목 이상 나란히 비교하기 — 누가 더 사들이고 있나
 # ═══════════════════════════════════════════════════════════════
-st.divider()
-st.header("⚖️ 종목별 외국인 보유율 비교")
+st.markdown('<div class="sec-gap"></div>', unsafe_allow_html=True)
 st.markdown(
-    "여러 종목을 한 그래프에 겹쳐 보면, 외국인이 **어느 쪽을 더 사들이는지**가 드러납니다. "
-    "같은 반도체라도 종목마다 흐름이 다를 수 있어요."
+    '<div class="sec-head">'
+    '<span class="sec-badge">비교</span>'
+    '<span class="sec-title">⚖️ 종목별 외국인 보유율 비교</span>'
+    '<span class="sec-sub">여러 종목 겹쳐 보기</span>'
+    '</div>',
+    unsafe_allow_html=True,
+)
+st.markdown(
+    '<div class="tone-bar">여러 종목을 한 그래프에 겹쳐 보면, 외국인이 <b>어느 쪽을 더 사들이는지</b>가 '
+    '드러납니다. 같은 반도체라도 종목마다 흐름이 다를 수 있어요.</div>',
+    unsafe_allow_html=True,
 )
 
 # 자주 보는 종목을 미리 담아 뒀습니다. (코드: 이름)
@@ -566,7 +676,10 @@ extra = [c.strip() for c in extra_raw.split(",") if c.strip().isdigit()]
 codes = list(dict.fromkeys(picked + extra))   # 중복 제거, 순서 유지
 
 if not codes:
-    st.info("위에서 종목을 하나 이상 골라 주세요.")
+    st.markdown(
+        '<div class="tone-bar">위에서 종목을 하나 이상 골라 주세요.</div>',
+        unsafe_allow_html=True,
+    )
 else:
     # ── 9-1. 보기 방식 고르기 ─────────────────────────────────
     c_left, c_right = st.columns([1, 1])
@@ -590,7 +703,8 @@ else:
     )
 
     # ── 9-2. 종목별로 네이버 자료 받아오기 ────────────────────
-    palette = ["#E4572E", "#2A9D8F", "#7B68A6", "#E9A13B", "#3D7EA6", "#B5495B"]
+    # 01_AInews.py의 그룹 색과 같은 계열 팔레트
+    palette = ["#4f46e5", "#0e9f6e", "#d97757", "#7c3aed", "#0ea5e9", "#f59e0b"]
     fig4 = go.Figure()
     rows = []          # 아래 요약 표에 쓸 값들
 
@@ -600,7 +714,11 @@ else:
             label = PRESETS.get(code, code)
 
             if cdf.empty:
-                st.warning(f"`{label}({code})` 자료를 불러오지 못했어요.")
+                st.markdown(
+                    f'<div class="tone-bar verdict-bad"><b>{_html.escape(str(label))}({_html.escape(code)})</b> '
+                    '자료를 불러오지 못했어요.</div>',
+                    unsafe_allow_html=True,
+                )
                 continue
 
             part = cdf.tail(cmp_window)
@@ -672,7 +790,7 @@ else:
 
 
 # ── 10. 주가 원본 데이터 (접어 두기) ──────────────────────────
-st.divider()
+st.markdown('<div class="sec-gap"></div>', unsafe_allow_html=True)
 with st.expander("주가 원본 데이터 보기"):
     st.dataframe(
         data.sort_values("날짜", ascending=False),  # 최근 날짜가 위로
