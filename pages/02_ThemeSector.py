@@ -146,6 +146,12 @@ THEMES = {
     "비트코인/블록체인": ["COIN", "MSTR", "MARA", "RIOT", "HOOD"],
     "중국 기술주": ["BABA", "PDD", "JD", "BIDU", "NIO"],
     "그린수소/재생에너지": ["ENPH", "FSLR", "PLUG", "BE", "NEE"],
+    "AI 전력망/인프라": ["GEV", "ETN", "VRT", "NRG", "PWR"],
+    "반도체 장비/EDA": ["AMAT", "LRCX", "KLAC", "SNPS", "CDNS"],
+    "구리/핵심광물": ["FCX", "SCCO", "TECK", "MP", "RIO"],
+    "핀테크/디지털결제": ["V", "MA", "PYPL", "SOFI", "AXP"],
+    "데이터센터 리츠": ["DLR", "EQIX", "IRM", "AMT", "SBAC"],
+    "금/귀금속": ["GLD", "NEM", "GOLD", "AEM", "FNV"],
 }
 
 ALL_TICKERS = sorted({t for tickers in THEMES.values() for t in tickers})
