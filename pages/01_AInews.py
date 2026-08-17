@@ -177,7 +177,22 @@ APP_CSS = """
 }
 .video-meta { font-size: 11px; color: #9096a5; padding: 0 12px 10px; }
 
-/* 반도체 브리핑 바로가기 버튼: 새로고침 버튼과 같은 모양 + 인디고 색으로 구분 */
+/* 새로고침 버튼: 강조하지 않고 텍스트 링크처럼 보이게 */
+div[data-testid="stButton"] button {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #6b7280 !important;
+    font-weight: 500 !important;
+    font-size: 13px !important;
+    padding: 0.4rem 0.6rem !important;
+}
+div[data-testid="stButton"] button:hover {
+    color: #4f46e5 !important;
+    text-decoration: underline;
+}
+
+/* 반도체 브리핑 바로가기 버튼: 인디고 색 박스 버튼 */
 div[data-testid="stPageLink"] {
     margin-bottom: 8px;
 }

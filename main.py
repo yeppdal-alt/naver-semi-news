@@ -208,7 +208,22 @@ div[data-testid="stMultiSelect"] span[data-baseweb="tag"] svg { fill: #4f46e5; }
 .empty-note { font-size: 12.5px; color: #9096a5; padding: 14px 2px; }
 .sec-gap { height: 34px; }
 
-/* AI 브리핑 바로가기 버튼: 새로고침 버튼과 같은 모양 + 인디고 색으로 구분 */
+/* 새로고침 버튼: 강조하지 않고 텍스트 링크처럼 보이게 */
+div[data-testid="stButton"] button {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #6b7280 !important;
+    font-weight: 500 !important;
+    font-size: 13px !important;
+    padding: 0.4rem 0.6rem !important;
+}
+div[data-testid="stButton"] button:hover {
+    color: #4f46e5 !important;
+    text-decoration: underline;
+}
+
+/* AI 브리핑 / 테마 트렌드 바로가기 버튼: 인디고 색 박스 버튼 */
 div[data-testid="stPageLink"] {
     margin-bottom: 8px;
 }
@@ -557,6 +572,13 @@ def main():
         render_topic(topic, chart_key=f"chart-{topic['id']}")
         if i < len(TOPICS) - 1:
             st.markdown('<div class="sec-gap"></div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="sec-gap"></div>', unsafe_allow_html=True)
+    footer_col1, footer_col2 = st.columns(2, gap="small")
+    with footer_col1:
+        st.page_link("pages/01_AInews.py", label="🤖 AI 브리핑", use_container_width=True)
+    with footer_col2:
+        st.page_link("pages/02_ThemeSector.py", label="🧭 테마 트렌드", use_container_width=True)
 
     st.caption(
         "논조 분류는 키워드 규칙 기반입니다. "
