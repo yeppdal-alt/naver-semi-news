@@ -95,7 +95,6 @@ APP_CSS = """
     max-width: 1280px;
     font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
-.block-container * { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 
 /* 페이지 헤더 */
 .hd-wrap { margin-bottom: 26px; }
