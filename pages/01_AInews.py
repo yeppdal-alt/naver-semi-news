@@ -542,7 +542,7 @@ def main():
     st.markdown(APP_CSS, unsafe_allow_html=True)
 
     now = datetime.now().strftime("%Y년 %m월 %d일 %H:%M")
-    head_left, head_right = st.columns([5, 1], vertical_alignment="bottom")
+    head_left, head_right = st.columns([3.3, 2.4], vertical_alignment="bottom")
     with head_left:
         st.markdown(
             '<div class="hd-wrap">'
@@ -553,12 +553,17 @@ def main():
             unsafe_allow_html=True,
         )
     with head_right:
-        st.page_link("main.py", label="🖥️ 반도체 브리핑", use_container_width=True)
-        if st.button("새로고침", use_container_width=True):
-            fetch_news_for_keyword.clear()
-            collect_ai_learning_news.clear()
-            fetch_youtube_videos.clear()
-            st.rerun()
+        btn_col1, btn_col2, refresh_col = st.columns([1, 1, 0.7], gap="small")
+        with btn_col1:
+            st.page_link("main.py", label="🖥️ 반도체 브리핑", use_container_width=True)
+        with btn_col2:
+            st.page_link("pages/02_ThemeSector.py", label="🧭 섹터 트렌드", use_container_width=True)
+        with refresh_col:
+            if st.button("새로고침", use_container_width=True):
+                fetch_news_for_keyword.clear()
+                collect_ai_learning_news.clear()
+                fetch_youtube_videos.clear()
+                st.rerun()
 
     st.markdown(
         '<div class="sec-head">'

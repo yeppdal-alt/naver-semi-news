@@ -9,20 +9,114 @@ from zoneinfo import ZoneInfo
 # 기본 설정
 # ----------------------------------------------------
 st.set_page_config(
-    page_title="테마 트렌드 분석",
+    page_title="섹터 트렌드 분석",
     page_icon="🧭",
     layout="wide",
 )
 
+APP_CSS = """
+<style>
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
+
+.stApp { background-color: #f7f8fc; }
+.block-container {
+    padding-top: 3.2rem !important;
+    padding-bottom: 3rem;
+    max-width: 1280px;
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.block-container * { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+/* 페이지 헤더 */
+.hd-wrap { margin-bottom: 26px; }
+.hd-eyebrow {
+    display: inline-block; background: #eef2ff; color: #4f46e5;
+    font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 999px;
+    margin-bottom: 12px;
+}
+.hd-title { font-size: 30px; font-weight: 700; color: #101322; margin: 0 0 6px 0; letter-spacing: -0.02em; }
+.hd-sub { font-size: 14px; color: #6b7280; margin: 0; }
+
+/* 섹션 헤더 */
+.sec-head {
+    display: flex; align-items: center; gap: 10px;
+    margin: 0 0 14px 0; padding-bottom: 12px; border-bottom: 1px solid #e8eaf1;
+}
+.sec-badge {
+    background: #eef2ff; color: #4f46e5; font-size: 11px; font-weight: 600;
+    padding: 4px 10px; border-radius: 6px;
+}
+.sec-title { font-size: 20px; font-weight: 700; color: #101322; letter-spacing: -0.01em; }
+.sec-sub { font-size: 13px; color: #9096a5; margin-left: 2px; }
+
+.tone-bar {
+    background: #ffffff; border: 1px solid #e8eaf1; border-left: 3px solid #4f46e5;
+    border-radius: 8px; padding: 10px 14px; font-size: 13.5px; color: #3b4051;
+    margin-bottom: 14px;
+}
+.sec-gap { height: 34px; }
+
+/* 종목 상세 expander를 카드처럼 */
+div[data-testid="stExpander"] {
+    background: #ffffff; border: 1px solid #e8eaf1 !important; border-radius: 12px;
+}
+
+/* 새로고침 버튼: 강조하지 않고 텍스트 링크처럼 보이게 */
+div[data-testid="stButton"] button {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #6b7280 !important;
+    font-weight: 500 !important;
+    font-size: 13px !important;
+    padding: 0.4rem 0.6rem !important;
+}
+div[data-testid="stButton"] button:hover {
+    color: #4f46e5 !important;
+    text-decoration: underline;
+}
+
+/* AI 브리핑 / 반도체 브리핑 바로가기 버튼: 인디고 색 박스 버튼 */
+div[data-testid="stPageLink"] {
+    margin-bottom: 8px;
+}
+div[data-testid="stPageLink"] a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: #4f46e5 !important;
+    color: #ffffff !important;
+    border: 1px solid #4f46e5 !important;
+    border-radius: 8px !important;
+    padding: 0.5rem 1rem !important;
+    min-height: 2.5rem;
+    text-decoration: none !important;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+div[data-testid="stPageLink"] a:hover {
+    background: #4338ca !important;
+    border-color: #4338ca !important;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+div[data-testid="stPageLink"] a * {
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+}
+</style>
+"""
+st.markdown(APP_CSS, unsafe_allow_html=True)
+
 
 def now_kst_et_str() -> str:
-    """현재 시각을 한국시간(KST)과 미국 동부시간(ET) 두 줄로 반환."""
+    """현재 시각을 한국시간(KST)과 미국 동부시간(ET) 한 줄로 반환."""
     now_utc = datetime.now(ZoneInfo("UTC"))
     kst = now_utc.astimezone(ZoneInfo("Asia/Seoul"))
     et = now_utc.astimezone(ZoneInfo("America/New_York"))
     return (
-        f"🇰🇷 KST {kst.strftime('%Y-%m-%d %H:%M:%S')}<br>"
-        f"🇺🇸 ET&nbsp;&nbsp;{et.strftime('%Y-%m-%d %H:%M:%S %Z')}"
+        f"KST {kst.strftime('%Y-%m-%d %H:%M')} · "
+        f"ET {et.strftime('%Y-%m-%d %H:%M %Z')}"
     )
 
 
@@ -111,25 +205,34 @@ st.sidebar.caption("데이터 출처: Yahoo Finance (yfinance) · 종목당 1개
 # ----------------------------------------------------
 # 메인 화면
 # ----------------------------------------------------
-col_title, col_time = st.columns([5, 2])
-with col_title:
-    st.title("🧭 테마 트렌드 분석")
-    st.caption("주요 투자 테마의 실시간 가격 모멘텀을 계산해 상승/하락/잠재 성장 테마로 자동 분류합니다")
-with col_time:
+head_left, head_right = st.columns([3.3, 2.4], vertical_alignment="bottom")
+with head_left:
     st.markdown(
-        f"""<div style='text-align:right; padding-top:20px; color:gray; font-size:0.85rem; line-height:1.5;'>
-        🕒 마지막 새로고침<br>{now_kst_et_str()}</div>""",
+        '<div class="hd-wrap">'
+        '<span class="hd-eyebrow">투자 테마 모멘텀 분석</span>'
+        '<h1 class="hd-title">🧭 섹터 트렌드 분석</h1>'
+        f'<p class="hd-sub">주요 투자 테마의 실시간 가격 모멘텀을 계산해 상승·하락·잠재 성장 테마로 자동 분류 '
+        f'· {now_kst_et_str()} 기준 · Yahoo Finance</p>'
+        '</div>',
         unsafe_allow_html=True,
     )
-    if st.button("🔄 새로고침", use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
+with head_right:
+    btn_col1, btn_col2, refresh_col = st.columns([1, 1, 0.7], gap="small")
+    with btn_col1:
+        st.page_link("main.py", label="🖥️ 반도체 브리핑", use_container_width=True)
+    with btn_col2:
+        st.page_link("pages/01_AInews.py", label="🤖 AI 브리핑", use_container_width=True)
+    with refresh_col:
+        if st.button("새로고침", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
 
-st.info(
-    "ℹ️ **분류 방식**: 테마는 사전에 큐레이션된 12개 대표 섹터이며, '주목받는/하락/잠재 성장' 라벨은 고정된 것이 아니라 "
-    "각 테마 구성 종목 5개의 **실시간 가격 수익률 평균**으로 매번 새로 계산됩니다. 🔥 상승 테마 = 최근 1개월 수익률 상위, "
-    "📉 하락 테마 = 최근 1개월 수익률 하위, 🌱 잠재 성장 테마 = 6개월 추세는 견조하지만 아직 단기 급등(상승 테마 상위권)에는 "
-    "포함되지 않은 테마입니다."
+st.markdown(
+    '<div class="tone-bar">ℹ️ <b>분류 방식</b>: 테마는 사전에 큐레이션된 12개 대표 섹터이며, '
+    "'주목받는/하락/잠재 성장' 라벨은 고정된 것이 아니라 각 테마 구성 종목 5개의 <b>실시간 가격 수익률 평균</b>으로 "
+    "매번 새로 계산됩니다. 🔥 상승 테마 = 최근 1개월 수익률 상위, 📉 하락 테마 = 최근 1개월 수익률 하위, "
+    "🌱 잠재 성장 테마 = 6개월 추세는 견조하지만 아직 단기 급등(상승 테마 상위권)에는 포함되지 않은 테마입니다.</div>",
+    unsafe_allow_html=True,
 )
 
 if not selected_theme_names:
@@ -167,7 +270,14 @@ theme_stats = df_all.groupby("테마")[["1개월", "3개월", "6개월"]].mean()
 theme_stats = theme_stats.sort_values("1개월", ascending=False).reset_index(drop=True)
 
 # ---- 전체 테마 랭킹 개요 차트 ----
-st.subheader("📊 전체 테마 모멘텀 랭킹 (1개월 평균 수익률)")
+st.markdown(
+    '<div class="sec-head">'
+    '<span class="sec-badge">랭킹</span>'
+    '<span class="sec-title">전체 테마 모멘텀 랭킹</span>'
+    '<span class="sec-sub">1개월 평균 수익률 기준</span>'
+    '</div>',
+    unsafe_allow_html=True,
+)
 colors = ["rgba(220,20,60,0.8)" if v < 0 else "rgba(34,139,34,0.8)" for v in theme_stats["1개월"]]
 fig_overview = go.Figure(go.Bar(
     x=theme_stats["1개월"] * 100, y=theme_stats["테마"],
@@ -177,10 +287,11 @@ fig_overview = go.Figure(go.Bar(
 fig_overview.update_layout(
     height=100 + 40 * len(theme_stats), xaxis_title="1개월 평균 수익률 (%)",
     margin=dict(l=10, r=40, t=20, b=20), yaxis=dict(autorange="reversed"),
+    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
 )
 st.plotly_chart(fig_overview, use_container_width=True)
 
-st.divider()
+st.markdown('<div class="sec-gap"></div>', unsafe_allow_html=True)
 
 # ---- 카테고리 분류 ----
 rising_themes = theme_stats.head(top_n)["테마"].tolist()
@@ -196,10 +307,17 @@ growth_candidates = theme_stats[
 growth_themes = growth_candidates.head(top_n)["테마"].tolist()
 
 
-def render_theme_section(title: str, theme_list: list, empty_msg: str):
-    st.subheader(title)
+def render_theme_section(badge: str, title: str, subtitle: str, theme_list: list, empty_msg: str):
+    st.markdown(
+        '<div class="sec-head">'
+        f'<span class="sec-badge">{badge}</span>'
+        f'<span class="sec-title">{title}</span>'
+        f'<span class="sec-sub">{subtitle}</span>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
     if not theme_list:
-        st.info(empty_msg)
+        st.markdown(f'<div class="tone-bar">{empty_msg}</div>', unsafe_allow_html=True)
         return
     for theme_name in theme_list:
         stat_row = theme_stats[theme_stats["테마"] == theme_name].iloc[0]
@@ -224,6 +342,7 @@ def render_theme_section(title: str, theme_list: list, empty_msg: str):
                 fig.update_layout(
                     title="종목별 1개월 수익률 (%)", height=320,
                     margin=dict(l=10, r=10, t=40, b=10),
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
@@ -240,31 +359,37 @@ def render_theme_section(title: str, theme_list: list, empty_msg: str):
 
 
 render_theme_section(
-    "🔥 최근 주목받는 테마 (Top 종목 5개씩)",
+    "상승",
+    "🔥 최근 주목받는 테마",
+    "Top 종목 5개씩 · 1개월 수익률 상위",
     rising_themes,
     "조건을 만족하는 상승 테마가 없습니다.",
 )
 
-st.divider()
+st.markdown('<div class="sec-gap"></div>', unsafe_allow_html=True)
 
 render_theme_section(
-    "📉 하락 테마 (Top 종목 5개씩)",
+    "하락",
+    "📉 하락 테마",
+    "Top 종목 5개씩 · 1개월 수익률 하위",
     falling_themes,
     "조건을 만족하는 하락 테마가 없습니다.",
 )
 
-st.divider()
+st.markdown('<div class="sec-gap"></div>', unsafe_allow_html=True)
 
 render_theme_section(
-    "🌱 잠재 성장 테마 (Top 종목 5개씩)",
+    "잠재성장",
+    "🌱 잠재 성장 테마",
+    "Top 종목 5개씩 · 6개월 추세 견조, 단기 급등 제외",
     growth_themes,
     "현재 조건(6개월 수익률 플러스이면서 단기 급등에 포함되지 않은 테마)을 만족하는 테마가 없습니다. "
     "사이드바에서 '카테고리별 표시 테마 수'를 조정해보세요.",
 )
 
-st.divider()
+st.markdown('<div class="sec-gap"></div>', unsafe_allow_html=True)
 st.caption(
     "※ 상단의 새로고침 시각은 페이지가 로드된 시각입니다. 가격 데이터는 30분 캐시(TTL)로 관리되어 실제 시세와 "
-    "차이가 날 수 있습니다. 즉시 최신화하려면 상단 '🔄 새로고침' 버튼을 눌러주세요. 테마 분류와 종목 구성은 "
+    "차이가 날 수 있습니다. 즉시 최신화하려면 상단 '새로고침' 버튼을 눌러주세요. 테마 분류와 종목 구성은 "
     "투자 참고용 큐레이션이며, 투자 판단의 책임은 본인에게 있습니다."
 )
