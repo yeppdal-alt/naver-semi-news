@@ -547,6 +547,7 @@ def main():
         )
     with head_right:
         st.page_link("pages/01_AInews.py", label="🤖 AI 브리핑", use_container_width=True)
+        st.page_link("pages/02_ThemeSector.py", label="🧭 테마 트렌드", use_container_width=True)
         if st.button("새로고침", use_container_width=True):
             fetch_news_for_keyword.clear()
             collect_all_news.clear()
