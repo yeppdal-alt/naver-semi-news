@@ -548,7 +548,7 @@ def main():
     st.markdown(APP_CSS, unsafe_allow_html=True)
 
     now = datetime.now().strftime("%Y년 %m월 %d일 %H:%M")
-    head_left, head_right = st.columns([3.3, 2.4], vertical_alignment="bottom")
+    head_left, head_right = st.columns([2.6, 3.4], vertical_alignment="bottom")
     with head_left:
         st.markdown(
             '<div class="hd-wrap">'
@@ -559,11 +559,13 @@ def main():
             unsafe_allow_html=True,
         )
     with head_right:
-        btn_col1, btn_col2, refresh_col = st.columns([1, 1, 0.7], gap="small")
+        btn_col1, btn_col2, btn_col3, refresh_col = st.columns([1, 1, 1, 0.7], gap="small")
         with btn_col1:
             st.page_link("pages/01_AInews.py", label="🤖 AI 브리핑", use_container_width=True)
         with btn_col2:
             st.page_link("pages/02_ThemeSector.py", label="🧭 섹터 트렌드", use_container_width=True)
+        with btn_col3:
+            st.page_link("pages/03_ForeignFlow.py", label="🌏 외국인 수급", use_container_width=True)
         with refresh_col:
             if st.button("새로고침", use_container_width=True):
                 fetch_news_for_keyword.clear()
@@ -576,11 +578,13 @@ def main():
             st.markdown('<div class="sec-gap"></div>', unsafe_allow_html=True)
 
     st.markdown('<div class="sec-gap"></div>', unsafe_allow_html=True)
-    footer_col1, footer_col2 = st.columns(2, gap="small")
+    footer_col1, footer_col2, footer_col3 = st.columns(3, gap="small")
     with footer_col1:
         st.page_link("pages/01_AInews.py", label="🤖 AI 브리핑", use_container_width=True)
     with footer_col2:
         st.page_link("pages/02_ThemeSector.py", label="🧭 섹터 트렌드", use_container_width=True)
+    with footer_col3:
+        st.page_link("pages/03_ForeignFlow.py", label="🌏 외국인 수급", use_container_width=True)
 
     st.caption(
         "논조 분류는 키워드 규칙 기반입니다. "

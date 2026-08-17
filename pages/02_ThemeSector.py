@@ -86,7 +86,7 @@ div[data-testid="stButton"] button:hover {
     text-decoration: underline;
 }
 
-/* AI 브리핑 / 반도체 브리핑 바로가기 버튼: 인디고 색 박스 버튼 */
+/* AI 브리핑 / 이슈 브리핑 바로가기 버튼: 인디고 색 박스 버튼 */
 div[data-testid="stPageLink"] {
     margin-bottom: 8px;
 }
@@ -273,7 +273,7 @@ st.sidebar.caption("데이터 출처: Yahoo Finance (yfinance) · 종목당 1개
 # ----------------------------------------------------
 # 메인 화면
 # ----------------------------------------------------
-head_left, head_right = st.columns([3.3, 2.4], vertical_alignment="bottom")
+head_left, head_right = st.columns([2.6, 3.4], vertical_alignment="bottom")
 with head_left:
     st.markdown(
         '<div class="hd-wrap">'
@@ -285,11 +285,13 @@ with head_left:
         unsafe_allow_html=True,
     )
 with head_right:
-    btn_col1, btn_col2, refresh_col = st.columns([1, 1, 0.7], gap="small")
+    btn_col1, btn_col2, btn_col3, refresh_col = st.columns([1, 1, 1, 0.7], gap="small")
     with btn_col1:
-        st.page_link("main.py", label="🖥️ 반도체 브리핑", use_container_width=True)
+        st.page_link("main.py", label="🖥️ 이슈 브리핑", use_container_width=True)
     with btn_col2:
         st.page_link("pages/01_AInews.py", label="🤖 AI 브리핑", use_container_width=True)
+    with btn_col3:
+        st.page_link("pages/03_ForeignFlow.py", label="🌏 외국인 수급", use_container_width=True)
     with refresh_col:
         if st.button("새로고침", use_container_width=True):
             st.cache_data.clear()

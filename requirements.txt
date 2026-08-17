@@ -4,3 +4,5 @@ pandas
 plotly
 yfinance
 tzdata
+lxml
+html5lib
