@@ -198,7 +198,7 @@ def fmt_num(x, decimals=2):
 
 
 def build_ranking_insights(stats: pd.DataFrame) -> list[str]:
-    """전체 테마 랭킹 차트를 바탕으로 규칙 기반 인사이트 5줄 생성 (LLM 미사용)."""
+    """전체 테마 랭킹 차트를 바탕으로 규칙 기반 인사이트 7줄 생성 (LLM 미사용)."""
     if stats.empty:
         return ["표시할 테마가 없습니다."]
 
@@ -212,12 +212,20 @@ def build_ranking_insights(stats: pd.DataFrame) -> list[str]:
     accel["accel"] = accel["1개월"] - accel["6개월"] / 6
     accel_top = accel.sort_values("accel", ascending=False).iloc[0]
 
+    # 한때(6개월) 강세였지만 최근(1개월) 식고 있는 테마
+    cooling_pool = accel[accel["6개월"] > 0].sort_values("accel", ascending=True)
+    cooling = cooling_pool.iloc[0] if not cooling_pool.empty else accel.sort_values("accel", ascending=True).iloc[0]
+
+    long_term_top = stats.sort_values("6개월", ascending=False).iloc[0]
+
     return [
         f"🏆 <b>{top['테마']}</b>가 1개월 {fmt_pct(top['1개월'])}로 가장 강한 모멘텀을 보이고 있습니다.",
         f"🥶 <b>{bottom['테마']}</b>는 1개월 {fmt_pct(bottom['1개월'])}로 가장 부진합니다.",
         f"📊 전체 {len(stats)}개 테마 중 {pos_n}개 상승, {neg_n}개 하락 중입니다.",
         f"📐 테마 평균 1개월 수익률은 {fmt_pct(avg_1m)}입니다.",
         f"🚀 <b>{accel_top['테마']}</b>는 6개월 평균 페이스 대비 최근 1개월 모멘텀이 가장 가파르게 붙었습니다.",
+        f"🐌 <b>{cooling['테마']}</b>는 6개월 추세 대비 최근 1개월 모멘텀이 가장 식고 있습니다.",
+        f"🎯 6개월 기준으로는 <b>{long_term_top['테마']}</b>가 {fmt_pct(long_term_top['6개월'])}로 가장 견조한 흐름을 이어가고 있습니다.",
     ]
 
 
