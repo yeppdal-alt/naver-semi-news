@@ -55,10 +55,10 @@ APP_CSS = """
 }
 .sec-gap { height: 34px; }
 
-/* 랭킹 차트 옆 인사이트 박스 */
+/* 랭킹 차트 옆 인사이트 박스 - 높이는 Python에서 차트와 동일하게 인라인으로 지정 */
 .insight-box {
     background: #ffffff; border: 1px solid #e8eaf1; border-left: 3px solid #4f46e5;
-    border-radius: 8px; padding: 14px 16px; height: 100%;
+    border-radius: 8px; padding: 14px 16px; box-sizing: border-box; overflow-y: auto;
 }
 .insight-box-title {
     font-size: 12.5px; font-weight: 700; color: #101322; margin-bottom: 8px;
@@ -204,7 +204,7 @@ def fmt_num(x, decimals=2):
 
 
 def build_ranking_insights(stats: pd.DataFrame) -> list[str]:
-    """전체 테마 랭킹 차트를 바탕으로 규칙 기반 인사이트 7줄 생성 (LLM 미사용)."""
+    """전체 테마 랭킹 차트를 바탕으로 규칙 기반 인사이트 10줄 생성 (LLM 미사용)."""
     if stats.empty:
         return ["표시할 테마가 없습니다."]
 
@@ -213,6 +213,7 @@ def build_ranking_insights(stats: pd.DataFrame) -> list[str]:
     pos_n = int((stats["1개월"] > 0).sum())
     neg_n = int((stats["1개월"] < 0).sum())
     avg_1m = stats["1개월"].mean()
+    spread = top["1개월"] - bottom["1개월"]
 
     accel = stats.copy()
     accel["accel"] = accel["1개월"] - accel["6개월"] / 6
@@ -223,15 +224,34 @@ def build_ranking_insights(stats: pd.DataFrame) -> list[str]:
     cooling = cooling_pool.iloc[0] if not cooling_pool.empty else accel.sort_values("accel", ascending=True).iloc[0]
 
     long_term_top = stats.sort_values("6개월", ascending=False).iloc[0]
+    mid_term_top = stats.sort_values("3개월", ascending=False).iloc[0]
+
+    # 6개월간 부진했지만 최근 1개월 반등 중인 테마 (없으면 낙폭이 가장 덜한 테마로 대체)
+    laggards = stats[stats["6개월"] < 0].sort_values("1개월", ascending=False)
+    if not laggards.empty:
+        cand = laggards.iloc[0]
+        if cand["1개월"] > 0:
+            turnaround_line = (
+                f"🔄 <b>{cand['테마']}</b>는 6개월간 부진했지만 최근 1개월 {fmt_pct(cand['1개월'])}로 반등하고 있습니다."
+            )
+        else:
+            turnaround_line = (
+                f"🔄 6개월 하락 테마 중에서는 <b>{cand['테마']}</b>의 낙폭이 가장 덜합니다(1개월 {fmt_pct(cand['1개월'])})."
+            )
+    else:
+        turnaround_line = "🔄 6개월 기준 하락 중인 테마가 없어, 전 테마가 중장기 상승 흐름입니다."
 
     return [
         f"🏆 <b>{top['테마']}</b>가 1개월 {fmt_pct(top['1개월'])}로 가장 강한 모멘텀을 보이고 있습니다.",
         f"🥶 <b>{bottom['테마']}</b>는 1개월 {fmt_pct(bottom['1개월'])}로 가장 부진합니다.",
         f"📊 전체 {len(stats)}개 테마 중 {pos_n}개 상승, {neg_n}개 하락 중입니다.",
         f"📐 테마 평균 1개월 수익률은 {fmt_pct(avg_1m)}입니다.",
+        f"↔️ 최고-최저 테마 간 1개월 수익률 격차는 {spread*100:.1f}%p입니다.",
         f"🚀 <b>{accel_top['테마']}</b>는 6개월 평균 페이스 대비 최근 1개월 모멘텀이 가장 가파르게 붙었습니다.",
         f"🐌 <b>{cooling['테마']}</b>는 6개월 추세 대비 최근 1개월 모멘텀이 가장 식고 있습니다.",
         f"🎯 6개월 기준으로는 <b>{long_term_top['테마']}</b>가 {fmt_pct(long_term_top['6개월'])}로 가장 견조한 흐름을 이어가고 있습니다.",
+        f"🧭 3개월 기준으로는 <b>{mid_term_top['테마']}</b>가 {fmt_pct(mid_term_top['3개월'])}로 가장 우수합니다.",
+        turnaround_line,
     ]
 
 
@@ -327,6 +347,11 @@ st.markdown(
     unsafe_allow_html=True,
 )
 rank_col, insight_col = st.columns([2.2, 1], gap="medium")
+
+# 인사이트 10줄이 들어갈 최소 높이를 확보하면서, 차트와 정확히 같은 픽셀 높이로 맞춘다.
+# (Streamlit의 컬럼 내부 래퍼가 여러 겹이라 CSS height:100%만으로는 안정적으로 안 맞음)
+panel_height = max(100 + 40 * len(theme_stats), 380)
+
 with rank_col:
     colors = ["rgba(220,20,60,0.8)" if v < 0 else "rgba(34,139,34,0.8)" for v in theme_stats["1개월"]]
     fig_overview = go.Figure(go.Bar(
@@ -335,7 +360,7 @@ with rank_col:
         text=[f"{v*100:+.1f}%" for v in theme_stats["1개월"]], textposition="outside",
     ))
     fig_overview.update_layout(
-        height=100 + 40 * len(theme_stats), xaxis_title="1개월 평균 수익률 (%)",
+        height=panel_height, xaxis_title="1개월 평균 수익률 (%)",
         margin=dict(l=10, r=40, t=20, b=20), yaxis=dict(autorange="reversed"),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
     )
@@ -344,7 +369,7 @@ with rank_col:
 with insight_col:
     insight_items = "".join(f"<li>{line}</li>" for line in build_ranking_insights(theme_stats))
     st.markdown(
-        '<div class="insight-box">'
+        f'<div class="insight-box" style="height:{panel_height}px;">'
         '<div class="insight-box-title">📌 랭킹 인사이트</div>'
         f'<ul>{insight_items}</ul>'
         '</div>',
