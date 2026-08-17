@@ -125,7 +125,6 @@ APP_CSS = """
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
 
 .stApp { background-color: #f7f8fc; }
-section[data-testid="stSidebar"], div[data-testid="stSidebarCollapsedControl"] { display: none !important; }
 .block-container {
     padding-top: 3.2rem !important;
     padding-bottom: 3rem;

@@ -55,6 +55,17 @@ APP_CSS = """
 }
 .sec-gap { height: 34px; }
 
+/* 랭킹 차트 옆 인사이트 박스 */
+.insight-box {
+    background: #ffffff; border: 1px solid #e8eaf1; border-left: 3px solid #4f46e5;
+    border-radius: 8px; padding: 14px 16px; height: 100%;
+}
+.insight-box-title {
+    font-size: 12.5px; font-weight: 700; color: #101322; margin-bottom: 8px;
+}
+.insight-box ul { margin: 0; padding-left: 18px; }
+.insight-box li { font-size: 13px; color: #3b4051; line-height: 1.7; }
+
 /* 종목 상세 expander를 카드처럼 */
 div[data-testid="stExpander"] {
     background: #ffffff; border: 1px solid #e8eaf1 !important; border-radius: 12px;
@@ -186,6 +197,30 @@ def fmt_num(x, decimals=2):
     return f"{x:,.{decimals}f}" if isinstance(x, (int, float)) else "N/A"
 
 
+def build_ranking_insights(stats: pd.DataFrame) -> list[str]:
+    """전체 테마 랭킹 차트를 바탕으로 규칙 기반 인사이트 5줄 생성 (LLM 미사용)."""
+    if stats.empty:
+        return ["표시할 테마가 없습니다."]
+
+    top = stats.iloc[0]
+    bottom = stats.iloc[-1]
+    pos_n = int((stats["1개월"] > 0).sum())
+    neg_n = int((stats["1개월"] < 0).sum())
+    avg_1m = stats["1개월"].mean()
+
+    accel = stats.copy()
+    accel["accel"] = accel["1개월"] - accel["6개월"] / 6
+    accel_top = accel.sort_values("accel", ascending=False).iloc[0]
+
+    return [
+        f"🏆 <b>{top['테마']}</b>가 1개월 {fmt_pct(top['1개월'])}로 가장 강한 모멘텀을 보이고 있습니다.",
+        f"🥶 <b>{bottom['테마']}</b>는 1개월 {fmt_pct(bottom['1개월'])}로 가장 부진합니다.",
+        f"📊 전체 {len(stats)}개 테마 중 {pos_n}개 상승, {neg_n}개 하락 중입니다.",
+        f"📐 테마 평균 1개월 수익률은 {fmt_pct(avg_1m)}입니다.",
+        f"🚀 <b>{accel_top['테마']}</b>는 6개월 평균 페이스 대비 최근 1개월 모멘텀이 가장 가파르게 붙었습니다.",
+    ]
+
+
 # ----------------------------------------------------
 # 사이드바
 # ----------------------------------------------------
@@ -277,18 +312,30 @@ st.markdown(
     '</div>',
     unsafe_allow_html=True,
 )
-colors = ["rgba(220,20,60,0.8)" if v < 0 else "rgba(34,139,34,0.8)" for v in theme_stats["1개월"]]
-fig_overview = go.Figure(go.Bar(
-    x=theme_stats["1개월"] * 100, y=theme_stats["테마"],
-    orientation="h", marker_color=colors,
-    text=[f"{v*100:+.1f}%" for v in theme_stats["1개월"]], textposition="outside",
-))
-fig_overview.update_layout(
-    height=100 + 40 * len(theme_stats), xaxis_title="1개월 평균 수익률 (%)",
-    margin=dict(l=10, r=40, t=20, b=20), yaxis=dict(autorange="reversed"),
-    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-)
-st.plotly_chart(fig_overview, use_container_width=True)
+rank_col, insight_col = st.columns([2.2, 1], gap="medium")
+with rank_col:
+    colors = ["rgba(220,20,60,0.8)" if v < 0 else "rgba(34,139,34,0.8)" for v in theme_stats["1개월"]]
+    fig_overview = go.Figure(go.Bar(
+        x=theme_stats["1개월"] * 100, y=theme_stats["테마"],
+        orientation="h", marker_color=colors,
+        text=[f"{v*100:+.1f}%" for v in theme_stats["1개월"]], textposition="outside",
+    ))
+    fig_overview.update_layout(
+        height=100 + 40 * len(theme_stats), xaxis_title="1개월 평균 수익률 (%)",
+        margin=dict(l=10, r=40, t=20, b=20), yaxis=dict(autorange="reversed"),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+    )
+    st.plotly_chart(fig_overview, use_container_width=True)
+
+with insight_col:
+    insight_items = "".join(f"<li>{line}</li>" for line in build_ranking_insights(theme_stats))
+    st.markdown(
+        '<div class="insight-box">'
+        '<div class="insight-box-title">📌 랭킹 인사이트</div>'
+        f'<ul>{insight_items}</ul>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
 st.markdown('<div class="sec-gap"></div>', unsafe_allow_html=True)
 
