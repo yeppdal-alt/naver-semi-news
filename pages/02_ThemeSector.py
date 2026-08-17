@@ -348,9 +348,9 @@ st.markdown(
 )
 rank_col, insight_col = st.columns([2.2, 1], gap="medium")
 
-# 인사이트 10줄이 들어갈 최소 높이를 확보하면서, 차트와 정확히 같은 픽셀 높이로 맞춘다.
+# 막대를 얇게 해서 차트 높이를 인사이트 10줄 분량에 맞추고, 정확히 같은 픽셀 높이로 맞춘다.
 # (Streamlit의 컬럼 내부 래퍼가 여러 겹이라 CSS height:100%만으로는 안정적으로 안 맞음)
-panel_height = max(100 + 40 * len(theme_stats), 380)
+panel_height = max(90 + 24 * len(theme_stats), 320)
 
 with rank_col:
     colors = ["rgba(220,20,60,0.8)" if v < 0 else "rgba(34,139,34,0.8)" for v in theme_stats["1개월"]]
@@ -363,6 +363,7 @@ with rank_col:
         height=panel_height, xaxis_title="1개월 평균 수익률 (%)",
         margin=dict(l=10, r=40, t=20, b=20), yaxis=dict(autorange="reversed"),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        bargap=0.35,
     )
     st.plotly_chart(fig_overview, use_container_width=True)
 
